@@ -67,8 +67,7 @@ Indexek: `{ts:1}` (TTL `expireAfterSeconds` = RETENTION_DAYS*86400), `{source:1,
 
 **Mongo `logs_archive`** (csak ha `ARCHIVE_ENABLED`): azonos séma, azonos `_id`. Indexek: `{ts:-1}`, `{source:1, ts:-1}`, `{tags:1, ts:-1}`, `{level:1}`, **text index** `{message:"text"}` – nincs TTL. A szövegszűrő `$text` (szó-alapú, gyors); ha a user idézőjelben ad meg mintát, `$regex` fallback (lassabb, de substring).
 
-**Manticore `logs`** (RT table): `id bigint` (Mongo ObjectId → 64 bit hash, vagy ObjectId hex tárolása `string attr`-ként + saját autoinc id), `ts timestamp`, `source string attribute`, `tags multi (MVA string helyett: json)`, `level uint`, `message text`.
-→ Egyszerűbb: `mongo_id string`, `tags json`, source/level attribútum, message full-text. Facet lekérdezés (`FACET source`) adja a source/tag listát.
+**Manticore `logs`** (RT table): `id bigint` (Manticore autoinc), `mongo_id string attribute` (ObjectId hex), `ts timestamp`, `source string attribute`, `tags json`, `level uint` (null → 0), `message text` (full-text). Keresés: `MATCH(q)` + attribútum-szűrők, `ORDER BY ts DESC`. `FACET source` / tags aggregálás adja a source/tag listát.
 
 ## API
 
