@@ -66,7 +66,32 @@ class ManticoreIndexTest {
         // phrase query of two words "t ag" does match this row, confirming the tokenizer split.)
         return ix.search(new SearchQuery(null, null, null, null, "t\"ag", null, 10, null)); })
       .compose(r -> { ctx.verify(() -> assertTrue(r.isEmpty()));
-        return ix.truncate(); })
+        // NUL byte in message/source: q() strips '\0' from SQL string literals entirely, so
+        // "nul\0here" is stored (and indexed as one word) as "nulhere". Verify insert doesn't
+        // error, and that a NUL in the *query* text also doesn't error -- q() strips it there
+        // too before it ever reaches Manticore's MATCH() parser.
+        LogEntry nulEntry = e("s\0rc", "nul\0here", List.of(), 1, Instant.now());
+        return ix.insertMany(List.of(nulEntry)).map(v2 -> nulEntry); })
+      .compose(nulEntry -> ix.search(new SearchQuery("nul", null, null, null, null, null, 10, null))
+          .map(r -> {
+            // Observed behavior (documented, not a bug): Manticore's default full-text matching
+            // is whole-token, not substring/prefix. Since NUL-stripping concatenates "nul" and
+            // "here" into a single indexed token "nulhere", the partial word "nul" alone does NOT
+            // match it -- confirming the NUL was actually removed (not left as a token separator)
+            // rather than silently dropped from the index. The stored data is proven searchable
+            // via the exact token below.
+            ctx.verify(() -> assertTrue(r.isEmpty()));
+            return nulEntry;
+          }))
+      .compose(nulEntry -> ix.search(new SearchQuery("nulhere", null, null, null, null, null, 10, null))
+          .map(r -> { ctx.verify(() -> assertEquals(List.of(nulEntry.id()), r)); return nulEntry; }))
+      .compose(nulEntry -> ix.search(new SearchQuery("nul\0here", null, null, null, null, null, 10, null)))
+      .compose(r -> {
+        // A NUL embedded in the query itself must not error either: q() strips it the same way,
+        // so this query is equivalent to "nulhere" and matches the same row.
+        ctx.verify(() -> assertEquals(1, r.size()));
+        return ix.truncate();
+      })
       .compose(v -> ix.search(new SearchQuery(null, null, null, null, null, null, 10, null)))
       .onComplete(ctx.succeeding(r -> ctx.verify(() -> { assertTrue(r.isEmpty()); ctx.completeNow(); })));
   }

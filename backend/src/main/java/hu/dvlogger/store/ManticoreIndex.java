@@ -43,8 +43,8 @@ public class ManticoreIndex {
     List<String> where = new ArrayList<>();
     List<String> match = new ArrayList<>();
     if (sq.q() != null && !sq.q().isBlank()) match.add("@message " + escapeMatch(sq.q()));
-    if (sq.tag() != null && !sq.tag().isBlank())
-      match.add("@tags_text \"" + escapeMatch(sq.tag().replace("\"", "")) + "\"");
+    String tag = sq.tag() == null ? null : sq.tag().replace("\"", "");
+    if (tag != null && !tag.isBlank()) match.add("@tags_text \"" + escapeMatch(tag) + "\"");
     if (!match.isEmpty()) where.add("MATCH(" + q(String.join(" ", match)) + ")");
     if (sq.from() != null) where.add("ts >= " + sq.from().getEpochSecond());
     if (sq.to() != null) where.add("ts <= " + sq.to().getEpochSecond());
