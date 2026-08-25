@@ -43,7 +43,8 @@ public class ManticoreIndex {
     List<String> where = new ArrayList<>();
     List<String> match = new ArrayList<>();
     if (sq.q() != null && !sq.q().isBlank()) match.add("@message " + escapeMatch(sq.q()));
-    if (sq.tag() != null) match.add("@tags_text " + escapeMatch("\"" + sq.tag() + "\""));
+    if (sq.tag() != null && !sq.tag().isBlank())
+      match.add("@tags_text \"" + escapeMatch(sq.tag().replace("\"", "")) + "\"");
     if (!match.isEmpty()) where.add("MATCH(" + q(String.join(" ", match)) + ")");
     if (sq.from() != null) where.add("ts >= " + sq.from().getEpochSecond());
     if (sq.to() != null) where.add("ts <= " + sq.to().getEpochSecond());
@@ -52,7 +53,7 @@ public class ManticoreIndex {
     if (sq.before() != null) where.add("mongo_id < " + q(sq.before()));
     int limit = Math.max(1, Math.min(sq.limit(), 1000));
     String sql = "SELECT mongo_id FROM logs" + (where.isEmpty() ? "" : " WHERE " + String.join(" AND ", where))
-        + " ORDER BY mongo_id DESC LIMIT " + limit + " OPTION max_matches=" + Math.max(limit, 1000);
+        + " ORDER BY mongo_id DESC LIMIT " + limit + " OPTION max_matches=1000";
     return pool.query(sql).execute().map(rows -> {
       List<String> ids = new ArrayList<>();
       for (Row r : rows) ids.add(r.getString("mongo_id"));
@@ -67,11 +68,11 @@ public class ManticoreIndex {
   private static String q(String s) {
     return "'" + s.replace("\\", "\\\\").replace("'", "\\'").replace("\0", "") + "'";
   }
-  /** Escapes Manticore full-text operators except quotes (so users can phrase-search). */
+  /** Escapes Manticore full-text operators (backslash first) except quotes (so users can phrase-search). */
   private static String escapeMatch(String s) {
     StringBuilder b = new StringBuilder();
     for (char c : s.toCharArray()) {
-      if ("!@()~/^$<=-|*".indexOf(c) >= 0) b.append('\\');
+      if (c == '\\' || "!@()~/^$<=-|*".indexOf(c) >= 0) b.append('\\');
       b.append(c);
     }
     return b.toString();

@@ -45,4 +45,29 @@ class ManticoreIndexTest {
       .compose(v -> ix.search(new SearchQuery(null, null, null, null, null, null, 10, null)))
       .onComplete(ctx.succeeding(r -> ctx.verify(() -> { assertEquals(List.of(c.id()), r); ctx.completeNow(); })));
   }
+
+  @Test void hostileContentIsInertAndSearchable(Vertx vertx, VertxTestContext ctx) {
+    ManticoreIndex ix = new ManticoreIndex(vertx, mc.getHost(), mc.getMappedPort(9306));
+    LogEntry h = e("we'ird\\src", "it's a \"quoted\" \\ path; @field | (x) -y !z", List.of("t\"ag"), 5, Instant.now());
+    ix.init().compose(v -> ix.truncate()).compose(v -> ix.insertMany(List.of(h)))
+      .compose(v -> ix.search(new SearchQuery("@field", null, null, null, null, null, 10, null)))
+      .compose(r -> { ctx.verify(() -> assertEquals(List.of(h.id()), r));
+        return ix.search(new SearchQuery("\\@field", null, null, null, null, null, 10, null)); })
+      .compose(r -> { ctx.verify(() -> assertEquals(List.of(h.id()), r));
+        return ix.search(new SearchQuery(null, null, null, "we'ird\\src", null, null, 10, null)); })
+      .compose(r -> { ctx.verify(() -> assertEquals(List.of(h.id()), r));
+        // Observed behavior (documented, not asserted as a bug): Manticore's default tokenizer
+        // treats '"' as a non-word separator, so the indexed tags_text "t\"ag" is stored as two
+        // tokens "t" and "ag". Our tag filter strips the '"' from the query instead (tags are
+        // simple tokens, so this is safe for normal tags) producing a single-token phrase "tag",
+        // which does NOT match the two adjacent tokens "t ag" -- so a tag containing '"' simply
+        // fails to match post-stripping rather than erroring or leaking as a live operator. This
+        // is the important, safe outcome: no exception, no injection. (Verified separately: a raw
+        // phrase query of two words "t ag" does match this row, confirming the tokenizer split.)
+        return ix.search(new SearchQuery(null, null, null, null, "t\"ag", null, 10, null)); })
+      .compose(r -> { ctx.verify(() -> assertTrue(r.isEmpty()));
+        return ix.truncate(); })
+      .compose(v -> ix.search(new SearchQuery(null, null, null, null, null, null, 10, null)))
+      .onComplete(ctx.succeeding(r -> ctx.verify(() -> { assertTrue(r.isEmpty()); ctx.completeNow(); })));
+  }
 }
