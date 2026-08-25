@@ -27,4 +27,10 @@ class AutoParserTest {
     assertEquals("{\"message\":\"j\"}", e.message());
     assertEquals("ip", e.source());
   }
+  @Test void nullRawDoesNotThrow() {
+    LogEntry e = p.parse(null, "10.0.0.1");
+    assertEquals("", e.message());
+    assertEquals("10.0.0.1", e.source());
+    assertEquals(List.of(), e.tags());
+  }
 }

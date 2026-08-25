@@ -38,4 +38,8 @@ class JsonParserTest {
     assertEquals(List.of("_unparsed"), e.tags());
     assertEquals("{not json", e.message());
   }
+  @Test void nullRawIsUnparsed() {
+    LogEntry e = p.parse(null, "ip");
+    assertEquals(List.of("_unparsed"), e.tags());
+  }
 }

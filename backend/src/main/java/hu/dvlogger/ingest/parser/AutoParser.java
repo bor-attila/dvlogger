@@ -8,6 +8,7 @@ public class AutoParser implements LogParser {
   public AutoParser(TextParser text) { this.text = text; }
 
   @Override public LogEntry parse(String raw, String remoteIp) {
+    if (raw == null) raw = "";
     String t = raw.stripLeading();
     if (t.startsWith("{")) {
       try {

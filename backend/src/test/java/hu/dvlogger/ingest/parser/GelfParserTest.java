@@ -28,4 +28,8 @@ class GelfParserTest {
   @Test void invalidIsUnparsed() {
     assertEquals(List.of("_unparsed"), p.parse("nope", "ip").tags());
   }
+  @Test void nullRawIsUnparsed() {
+    LogEntry e = p.parse(null, "ip");
+    assertEquals(List.of("_unparsed"), e.tags());
+  }
 }
