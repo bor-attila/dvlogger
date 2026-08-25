@@ -10,7 +10,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <vertx.version>4.5.10</vertx.version>
     <junit.version>5.10.2</junit.version>
-    <testcontainers.version>1.19.8</testcontainers.version>
+    <testcontainers.version>1.21.3</testcontainers.version>
   </properties>
   <dependencyManagement>
     <dependencies>
@@ -32,7 +32,17 @@
   </dependencies>
   <build>
     <plugins>
-      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.2.5</version></plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.2.5</version>
+        <configuration>
+          <!-- Testcontainers' initial Docker probe hardcodes API 1.32 when unset, which modern
+               Docker Engines (min API 1.44+) reject outright. Pinning a modern version here lets
+               the probe succeed; real request/response still negotiates normally. -->
+          <systemPropertyVariables>
+            <api.version>1.44</api.version>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId><artifactId>maven-shade-plugin</artifactId><version>3.5.3</version>
         <executions><execution><phase>package</phase><goals><goal>shade</goal></goals>
