@@ -35,6 +35,13 @@ class WriterVerticleTest {
     }
   }
 
+  /** In-memory stand-in that always succeeds immediately: keeps flush() fully synchronous so
+   * batchSize=1 messages never bundle into a single batch while a prior flush is in flight. */
+  static class FakeMongo extends MongoStore {
+    FakeMongo() { super(null, 14); }
+    @Override public Future<Void> insertMany(List<LogEntry> entries) { return Future.succeededFuture(); }
+  }
+
   /** Polls `check` until it stops throwing, then runs `onDone`; fails the test after timeoutMs. */
   private static void pollUntil(Vertx vertx, VertxTestContext ctx, long timeoutMs, Runnable check, Runnable onDone) {
     attempt(vertx, ctx, System.currentTimeMillis() + timeoutMs, check, onDone);
@@ -75,5 +82,23 @@ class WriterVerticleTest {
             ctx.completeNow();
           }))));
       }));
+  }
+
+  @Test void reindexQueueIsBounded(Vertx vertx, VertxTestContext ctx) {
+    Config cfg = Config.fromEnv(Map.of("AUTH_USER","u","AUTH_PASSWORD","p","BATCH_SIZE","1","BATCH_MS","50"));
+    FakeIndex ix = new FakeIndex(vertx, Integer.MAX_VALUE); // always fails
+    Stats stats = new Stats();
+    // Shrink MAX_REINDEX_BATCHES (200 in production) so the test doesn't need 205 messages.
+    int max = 3;
+    WriterVerticle wv = new WriterVerticle(cfg, new FakeMongo(), null, ix, stats);
+    wv.maxReindexBatches = max;
+    vertx.deployVerticle(wv).onComplete(ctx.succeeding(id -> {
+      for (int i = 0; i < max + 5; i++)
+        vertx.eventBus().send(Ingest.ADDRESS, LogEntry.of(Instant.now(), "s", List.of(), null, "m" + i, "h", new JsonObject()).toMongo());
+      pollUntil(vertx, ctx, 5000, () -> {
+        assertTrue(stats.indexDropped.get() >= 5);
+        assertEquals(max, stats.reindexQueue.get());
+      }, ctx::completeNow);
+    }));
   }
 }

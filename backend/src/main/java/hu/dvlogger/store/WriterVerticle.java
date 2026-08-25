@@ -14,10 +14,20 @@ import java.util.Deque;
 import java.util.List;
 
 public class WriterVerticle extends AbstractVerticle {
+  static final int MAX_REINDEX_BATCHES = 200;
+
   private final Config cfg; private final MongoStore mongo; private final ArchiveStore archive;
   private final ManticoreIndex index; private final Stats stats;
   private List<LogEntry> buffer = new ArrayList<>();
+  /**
+   * Batches whose index write failed, retried periodically by {@link #retryReindex()}. Bounded by
+   * {@link #maxReindexBatches}: the entries are still safe in Mongo (REINDEX_ON_START can rebuild
+   * the index from there), so on overflow the oldest batch is dropped rather than growing without
+   * limit.
+   */
   private final Deque<List<LogEntry>> reindexQueue = new ArrayDeque<>();
+  /** Package-private so tests can shrink this below {@link #MAX_REINDEX_BATCHES} for a fast bounded-queue test. */
+  int maxReindexBatches = MAX_REINDEX_BATCHES;
   private boolean flushing = false;
   private MessageConsumer<JsonObject> consumer;
 
@@ -38,25 +48,41 @@ public class WriterVerticle extends AbstractVerticle {
     start.complete();
   }
 
-  private void flush() {
-    if (flushing || buffer.isEmpty()) return;
+  private Future<Void> flush() {
+    if (flushing || buffer.isEmpty()) return Future.succeededFuture();
     List<LogEntry> batch = buffer; buffer = new ArrayList<>();
     flushing = true;
-    writeMongo(batch, 3)
+    return writeMongo(batch, 3)
       .compose(v -> archive == null ? Future.succeededFuture() : archive.insertMany(batch)
           .recover(t -> { System.err.println("archive write failed: " + t.getMessage()); return Future.succeededFuture(); }))
       .onSuccess(v -> { stats.written.addAndGet(batch.size()); writeIndex(batch); })
       .onFailure(t -> { stats.dropped.addAndGet(batch.size()); System.err.println("mongo write failed, dropped " + batch.size() + ": " + t.getMessage()); })
-      .onComplete(v -> { flushing = false; if (buffer.size() >= cfg.batchSize()) flush(); });
+      .compose(v -> flushDone(), t -> flushDone());
+  }
+
+  /** Resets flushing and chains into another flush if the buffer already refilled past batchSize. */
+  private Future<Void> flushDone() {
+    flushing = false;
+    return buffer.size() >= cfg.batchSize() ? flush() : Future.succeededFuture();
   }
 
   private Future<Void> writeMongo(List<LogEntry> batch, int attempts) {
-    return mongo.insertMany(batch).recover(t -> attempts > 1 ? writeMongo(batch, attempts - 1) : Future.failedFuture(t));
+    return mongo.insertMany(batch).recover(t -> attempts > 1
+        ? vertx.timer(250L * (4 - attempts)).compose(v -> writeMongo(batch, attempts - 1))
+        : Future.failedFuture(t));
   }
 
   private void writeIndex(List<LogEntry> batch) {
     index.insertMany(batch).onFailure(t -> {
       stats.indexFailed.incrementAndGet();
+      if (reindexQueue.size() >= maxReindexBatches) {
+        List<LogEntry> dropped = reindexQueue.pollFirst();
+        if (dropped != null) {
+          stats.indexDropped.addAndGet(dropped.size());
+          System.err.println("reindex queue full (" + maxReindexBatches + " batches), dropping oldest batch of "
+              + dropped.size() + " entries (still safe in Mongo; rebuildable via REINDEX_ON_START)");
+        }
+      }
       reindexQueue.add(batch);
       stats.reindexQueue.set(reindexQueue.size());
     });
@@ -70,6 +96,6 @@ public class WriterVerticle extends AbstractVerticle {
   }
 
   @Override public void stop(Promise<Void> stop) {
-    consumer.unregister().onComplete(v -> { flush(); stop.complete(); });
+    consumer.unregister().compose(v -> flush()).onComplete(v -> stop.complete());
   }
 }

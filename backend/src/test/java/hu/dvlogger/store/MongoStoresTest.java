@@ -49,6 +49,15 @@ class MongoStoresTest {
       })));
   }
 
+  @Test void insertManyIsIdempotentOnDuplicateIds(VertxTestContext ctx) {
+    MongoStore s = new MongoStore(client, 14);
+    List<LogEntry> es = List.of(entry("a","1",List.of(),Instant.now()), entry("b","2",List.of(),Instant.now()));
+    s.insertMany(es)
+      .compose(v -> s.insertMany(es))
+      .compose(v -> client.count(MongoStore.COLL, new JsonObject()))
+      .onComplete(ctx.succeeding(n -> ctx.verify(() -> { assertEquals(2L, n); ctx.completeNow(); })));
+  }
+
   @Test void distinctSources(VertxTestContext ctx) {
     MongoStore s = new MongoStore(client, 14);
     s.insertMany(List.of(entry("x","1",List.of("t1"),Instant.now()), entry("y","2",List.of("t2"),Instant.now())))

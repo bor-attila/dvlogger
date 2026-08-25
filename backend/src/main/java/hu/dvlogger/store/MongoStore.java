@@ -1,10 +1,12 @@
 package hu.dvlogger.store;
 
+import com.mongodb.MongoBulkWriteException;
 import hu.dvlogger.model.LogEntry;
 import io.vertx.core.Future;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.mongo.BulkOperation;
+import io.vertx.ext.mongo.BulkWriteOptions;
 import io.vertx.ext.mongo.FindOptions;
 import io.vertx.ext.mongo.IndexOptions;
 import io.vertx.ext.mongo.MongoClient;
@@ -27,10 +29,24 @@ public class MongoStore {
         .compose(v -> client.createIndex(COLL, new JsonObject().put("tags", 1)));
   }
 
+  /**
+   * Unordered bulk insert so one duplicate key doesn't abort the rest of the batch. Retries of an
+   * already-written batch (e.g. WriterVerticle's Mongo retry after a timeout whose write actually
+   * succeeded) surface as a MongoBulkWriteException where every error is a duplicate key (11000);
+   * that case is treated as success since the documents are already present. Any other error
+   * (including a bulk write that is partly duplicates, partly something else) still fails.
+   */
   public static Future<Void> bulkInsert(MongoClient client, String coll, List<LogEntry> entries) {
     if (entries.isEmpty()) return Future.succeededFuture();
     List<BulkOperation> ops = entries.stream().map(e -> BulkOperation.createInsert(e.toMongo())).toList();
-    return client.bulkWrite(coll, ops).mapEmpty();
+    Future<Void> write = client.bulkWriteWithOptions(coll, ops, new BulkWriteOptions().setOrdered(false)).mapEmpty();
+    return write.recover(t -> {
+      if (t instanceof MongoBulkWriteException ex && !ex.getWriteErrors().isEmpty()
+          && ex.getWriteErrors().stream().allMatch(e -> e.getCode() == 11000)) {
+        return Future.succeededFuture();
+      }
+      return Future.failedFuture(t);
+    });
   }
 
   public Future<Void> insertMany(List<LogEntry> entries) { return bulkInsert(client, COLL, entries); }
