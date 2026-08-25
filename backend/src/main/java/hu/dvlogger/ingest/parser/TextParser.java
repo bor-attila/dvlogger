@@ -17,6 +17,7 @@ public class TextParser implements LogParser {
   }
 
   @Override public LogEntry parse(String raw, String remoteIp) {
+    if (raw == null) raw = "";
     Matcher m = pattern.matcher(raw);
     String source = remoteIp, message = raw;
     List<String> tags = List.of();

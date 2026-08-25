@@ -47,4 +47,15 @@ class TextParserTest {
     assertEquals("ip", e.source());
     assertEquals("no pipe here", e.message());
   }
+  @Test void nullRawDoesNotThrow() {
+    LogEntry e = p.parse(null, "10.0.0.1");
+    assertEquals("", e.message());
+    assertEquals("10.0.0.1", e.source());
+  }
+  @Test void multiLineMessageMatches() {
+    LogEntry e = p.parse("app [t] line1\nline2", "ip");
+    assertEquals("app", e.source());
+    assertEquals(List.of("t"), e.tags());
+    assertEquals("line1\nline2", e.message());
+  }
 }
