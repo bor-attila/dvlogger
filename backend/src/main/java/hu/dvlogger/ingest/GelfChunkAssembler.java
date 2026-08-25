@@ -8,6 +8,8 @@ import java.util.Optional;
 /** Reassembles GELF chunked datagrams (magic 0x1e 0x0f). Not thread-safe: use from one verticle. */
 public class GelfChunkAssembler {
   private record Pending(Buffer[] parts, long firstSeen) { }
+  // Keyed only by the 64-bit message id (no sender scoping): matches standard GELF server
+  // behavior, which relies on senders generating random 64-bit ids to avoid collisions.
   private final Map<Long, Pending> pending = new HashMap<>();
   private final long ttlMs;
 
