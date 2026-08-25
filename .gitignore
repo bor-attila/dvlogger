@@ -1,0 +1,8 @@
+.superpowers/
+backend/target/
+backend/src/main/resources/webroot/
+frontend/node_modules/
+frontend/.nuxt/
+frontend/.output/
+frontend/dist/
+.env
