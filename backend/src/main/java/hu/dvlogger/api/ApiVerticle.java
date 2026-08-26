@@ -61,5 +61,14 @@ public class ApiVerticle extends AbstractVerticle {
     registerProtectedRoutes(router, auth);
   }
   /** Search routes (Task 10). */
-  protected void registerProtectedRoutes(Router router, AuthHandler auth) { }
+  protected void registerProtectedRoutes(Router router, AuthHandler auth) {
+    new SearchHandler(mongo, index).register(router);
+    new ArchiveSearchHandler(archive).register(router);
+    router.route("/api/*").failureHandler(rc -> {
+      Throwable t = rc.failure();
+      if (t != null) t.printStackTrace();
+      rc.response().setStatusCode(rc.statusCode() > 0 ? rc.statusCode() : 500)
+          .end(new JsonObject().put("error", t == null ? "error" : t.getMessage()).encode());
+    });
+  }
 }
