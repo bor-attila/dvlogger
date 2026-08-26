@@ -37,6 +37,14 @@ class AuthAndIngestTest {
       .onComplete(ctx.succeeding(r -> ctx.verify(() -> { assertEquals(401, r.statusCode()); ctx.completeNow(); })));
   }
 
+  @Test void malformedLoginBodyIs401(Vertx vertx, VertxTestContext ctx) {
+    WebClient c = WebClient.create(vertx);
+    vertx.deployVerticle(new ApiVerticle(cfg, null, null, null, new Stats(), Parsers.forConfig(cfg)))
+      .compose(id -> c.post(18081, "localhost", "/api/login").putHeader("content-type", "application/json")
+          .sendBuffer(io.vertx.core.buffer.Buffer.buffer("not json{")))
+      .onComplete(ctx.succeeding(r -> ctx.verify(() -> { assertEquals(401, r.statusCode()); ctx.completeNow(); })));
+  }
+
   @Test void ingestArrayAndLines(Vertx vertx, VertxTestContext ctx) {
     AtomicInteger n = new AtomicInteger();
     vertx.eventBus().consumer(Ingest.ADDRESS, m -> n.incrementAndGet());
@@ -46,12 +54,40 @@ class AuthAndIngestTest {
       .compose(r -> { ctx.verify(() -> assertEquals(401, r.statusCode()));
         return c.post(18081, "localhost", "/api/ingest").putHeader("X-Ingest-Token","tok")
           .sendJson(new JsonArray().add(new JsonObject().put("message","a")).add(new JsonObject().put("message","b"))); })
-      .compose(r -> { ctx.verify(() -> assertEquals(2, r.bodyAsJsonObject().getInteger("accepted")));
+      .compose(r -> { ctx.verify(() -> {
+          assertEquals(2, r.bodyAsJsonObject().getInteger("accepted"));
+          assertNull(r.getHeader("Set-Cookie"));
+        });
         return c.post(18081, "localhost", "/api/ingest").putHeader("X-Ingest-Token","tok")
           .sendBuffer(io.vertx.core.buffer.Buffer.buffer("app [] l1\napp [] l2\n\napp [] l3")); })
       .onComplete(ctx.succeeding(r -> ctx.verify(() -> {
         assertEquals(3, r.bodyAsJsonObject().getInteger("accepted"));
         assertEquals(5, n.get());
+        ctx.completeNow();
+      })));
+  }
+
+  @Test void ingestArrayWithNonObjectElements(Vertx vertx, VertxTestContext ctx) {
+    AtomicInteger n = new AtomicInteger();
+    vertx.eventBus().consumer(Ingest.ADDRESS, m -> n.incrementAndGet());
+    WebClient c = WebClient.create(vertx);
+    vertx.deployVerticle(new ApiVerticle(cfg, null, null, null, new Stats(), Parsers.forConfig(cfg)))
+      .compose(id -> c.post(18081, "localhost", "/api/ingest").putHeader("X-Ingest-Token","tok")
+          .sendJson(new JsonArray().add(new JsonObject().put("message","a")).add("plain line").add(42)))
+      .onComplete(ctx.succeeding(r -> ctx.verify(() -> {
+        assertEquals(3, r.bodyAsJsonObject().getInteger("accepted"));
+        assertEquals(3, n.get());
+        ctx.completeNow();
+      })));
+  }
+
+  @Test void ingestEmptyBodyAcceptsZero(Vertx vertx, VertxTestContext ctx) {
+    WebClient c = WebClient.create(vertx);
+    vertx.deployVerticle(new ApiVerticle(cfg, null, null, null, new Stats(), Parsers.forConfig(cfg)))
+      .compose(id -> c.post(18081, "localhost", "/api/ingest").putHeader("X-Ingest-Token","tok")
+          .sendBuffer(io.vertx.core.buffer.Buffer.buffer("")))
+      .onComplete(ctx.succeeding(r -> ctx.verify(() -> {
+        assertEquals(0, r.bodyAsJsonObject().getInteger("accepted"));
         ctx.completeNow();
       })));
   }

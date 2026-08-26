@@ -36,8 +36,12 @@ public class ApiVerticle extends AbstractVerticle {
     router.get("/api/health").handler(rc -> rc.json(new JsonObject()
         .put("status", "ok").put("archiveEnabled", cfg.archiveEnabled())
         .put("stats", stats == null ? new JsonObject() : stats.toJson())));
-    router.route().handler(SessionHandler.create(LocalSessionStore.create(vertx))
-        .setCookieHttpOnlyFlag(true).setCookieSameSite(CookieSameSite.STRICT));
+    SessionHandler sessionHandler = SessionHandler.create(LocalSessionStore.create(vertx))
+        .setCookieHttpOnlyFlag(true).setCookieSameSite(CookieSameSite.STRICT);
+    router.route().handler(rc -> {
+      if (rc.request().path().equals("/api/ingest")) rc.next();
+      else sessionHandler.handle(rc);
+    });
     registerRoutes(router);
     router.route("/*").handler(StaticHandler.create("webroot").setIndexPage("index.html"));
     // SPA fallback: unknown non-API paths serve index.html

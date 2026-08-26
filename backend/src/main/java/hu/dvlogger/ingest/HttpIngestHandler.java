@@ -23,9 +23,11 @@ public class HttpIngestHandler {
     int n = 0;
     String t = body.stripLeading();
     if (t.startsWith("[")) {
-      try {
-        for (Object o : new JsonArray(t)) { publish(o instanceof JsonObject j ? j.encode() : o.toString(), ip); n++; }
-      } catch (Exception e) { n += publishLines(body, ip); }
+      JsonArray arr;
+      try { arr = new JsonArray(t); } catch (Exception e) { arr = null; }
+      if (arr != null) {
+        for (Object o : arr) { publish(o instanceof JsonObject j ? j.encode() : String.valueOf(o), ip); n++; }
+      } else n = publishLines(body, ip);
     } else n = publishLines(body, ip);
     rc.json(new JsonObject().put("accepted", n));
   }
