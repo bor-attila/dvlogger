@@ -71,7 +71,7 @@ All variables below can be set in `.env` (copied from `.env.example`); container
 | Variable | Default | Description |
 |---|---|---|
 | `AUTH_USER` | `admin` | Dashboard/API login username |
-| `AUTH_PASSWORD` | `change-me` | Dashboard/API login password — **change this** |
+| `AUTH_PASSWORD` | `admin` | Dashboard/API login password — **change this** |
 | `LOG_FORMAT` | `auto` | Ingest parser: `text` \| `json` \| `gelf` \| `auto` (auto-detect per message) |
 | `LOG_TEXT_PATTERN` | *(built-in default)* | Regex for the `text` parser, with named groups `source`, `tags`, `message` |
 | `ARCHIVE_ENABLED` | `false` | Also write every entry to a permanent, non-expiring archive collection |
@@ -106,6 +106,26 @@ Testcontainers, so a working Docker daemon is required locally.
 proxies `/api` to `http://localhost:8080` (hardcoded in `nuxt.config.ts`'s `nitro.devProxy`),
 so run a backend on the default port `8080` first (e.g. `docker compose up -d` with default
 ports, or `HTTP_PORT_HOST` left unset).
+
+## Throughput / UDP tuning
+
+`scripts/loadgen.sh` was run against a compose stack on a 2-CPU host: 8 workers x
+20000 messages (160000 total) over UDP to the ingest port. Result: `received=156419`,
+`written=156419`, `dropped=0`, `reindexQueue=0`, `indexDropped=0` — a wall time of
+24m21s (real), i.e. ~107 msg/s, far below the "well under a minute" (>5k msg/s)
+expectation. The bottleneck was the load generator itself, not the server or the
+network: the script's `worker()` loop forks a `date` subprocess per line, which on
+a 2-core box limited a single worker to roughly 100-150 lines/s, and GNU `parallel`
+could only run 2 of the 8 workers concurrently. The ~2.2% packet loss
+(160000 sent vs. 156419 received) is consistent with ordinary UDP loss on loopback
+under load and did not grow with elapsed time; `dropped=0` and `reindexQueue=0`
+throughout confirm the server kept up with whatever arrived (no backpressure). If
+`received` were much further below `sent` on a given host, the standard fix is to
+raise `net.core.rmem_max` (e.g. `sysctl -w net.core.rmem_max=26214400`) to give the
+UDP socket more receive-buffer headroom; on this host `net.core.rmem_max` was left
+at its default (4194304) since the loss rate did not warrant changing it. For a
+realistic >5k msg/s throughput measurement, prefer more CPU cores and/or a generator
+that doesn't fork a process per log line.
 
 ## License
 
