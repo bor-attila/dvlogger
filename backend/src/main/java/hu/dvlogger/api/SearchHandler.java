@@ -8,6 +8,7 @@ import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
+import java.time.DateTimeException;
 import java.util.List;
 
 public class SearchHandler {
@@ -23,15 +24,23 @@ public class SearchHandler {
   private void logs(RoutingContext rc) {
     SearchQuery q;
     try { q = SearchQuery.fromParams(rc.queryParams()); }
-    catch (Exception e) { rc.response().setStatusCode(400).end(new JsonObject().put("error", "bad query: " + e.getMessage()).encode()); return; }
-    index.search(q).compose(mongo::findByIds).onSuccess(items -> rc.json(page(items, q.limit()))).onFailure(rc::fail);
+    catch (IllegalArgumentException | DateTimeException e) {
+      rc.response().setStatusCode(400).end(new JsonObject().put("error", "bad query: " + e.getMessage()).encode()); return;
+    }
+    SearchQuery fq = q;
+    index.search(fq).compose(ids -> {
+      // Cap the candidate id list to the page size *before* deriving the cursor and hydrating, so
+      // `next` reflects the last id actually considered for this page - not the last id Mongo happened
+      // to still have a document for (a doc can be missing from Mongo, e.g. TTL-expired after indexing,
+      // without meaning the index has no more matches beyond it).
+      List<String> pageIds = ids.size() > fq.limit() ? ids.subList(0, fq.limit()) : ids;
+      String next = pageIds.size() >= fq.limit() ? pageIds.get(pageIds.size() - 1) : null;
+      return mongo.findByIds(pageIds).map(items -> page(items, next));
+    }).onSuccess(rc::json).onFailure(rc::fail);
   }
 
-  /** Caps items to limit defensively (stores are expected to already honor it) and derives the cursor. */
-  static JsonObject page(List<LogEntry> items, int limit) {
-    List<LogEntry> capped = items.size() > limit ? items.subList(0, limit) : items;
-    JsonArray arr = new JsonArray(capped.stream().map(LogEntry::toApi).toList());
-    String next = capped.size() >= limit ? capped.get(capped.size() - 1).id() : null;
+  static JsonObject page(List<LogEntry> items, String next) {
+    JsonArray arr = new JsonArray(items.stream().map(LogEntry::toApi).toList());
     return new JsonObject().put("items", arr).put("next", next);
   }
 }

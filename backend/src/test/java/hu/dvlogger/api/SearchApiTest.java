@@ -54,4 +54,32 @@ class SearchApiTest {
         return c.get(18082, "localhost", "/api/archive/tags").send(); })
       .onComplete(ctx.succeeding(r -> ctx.verify(() -> { assertEquals(List.of("t1","t2"), r.bodyAsJsonArray().getList()); ctx.completeNow(); })));
   }
+
+  /**
+   * If a document the index still knows about has since disappeared from Mongo (e.g. TTL-expired
+   * between indexing and querying), the cursor must still be derived from the index's id list, not
+   * from however many documents happened to hydrate - otherwise a full page looks like the last page.
+   */
+  @Test void missingMongoDocDoesNotShortenCursor(Vertx vertx, VertxTestContext ctx) {
+    Config cfg = Config.fromEnv(Map.of("AUTH_USER","a","AUTH_PASSWORD","p","HTTP_PORT","18083","ARCHIVE_ENABLED","false"));
+    MongoClient client = MongoClient.create(vertx, new JsonObject().put("connection_string", mongo.getConnectionString()).put("db_name", "api2"));
+    MongoStore ms = new MongoStore(client, 14);
+    LogEntry e1 = LogEntry.of(Instant.now(), "web", List.of("t1"), 6, "present", "h", new JsonObject());
+    String missingId = LogEntry.newId();
+    ManticoreIndex fake = new ManticoreIndex(vertx, "localhost", 1) {
+      @Override public Future<List<String>> search(SearchQuery q) { return Future.succeededFuture(List.of(e1.id(), missingId)); }
+    };
+    WebClientSession c = WebClientSession.create(WebClient.create(vertx));
+    ms.init().compose(v -> ms.insertMany(List.of(e1)))
+      .compose(v -> vertx.deployVerticle(new ApiVerticle(cfg, ms, null, fake, new Stats(), Parsers.forConfig(cfg))))
+      .compose(id -> c.post(18083, "localhost", "/api/login").sendJsonObject(new JsonObject().put("user","a").put("password","p")))
+      .compose(r -> c.get(18083, "localhost", "/api/logs").addQueryParam("limit","2").send())
+      .onComplete(ctx.succeeding(r -> ctx.verify(() -> {
+        JsonObject b = r.bodyAsJsonObject();
+        assertEquals(1, b.getJsonArray("items").size());
+        assertEquals("present", b.getJsonArray("items").getJsonObject(0).getString("message"));
+        assertEquals(missingId, b.getString("next"));
+        ctx.completeNow();
+      })));
+  }
 }

@@ -24,4 +24,13 @@ class SearchQueryTest {
     SearchQuery q = SearchQuery.fromParams(MultiMap.caseInsensitiveMultiMap().add("q","  ").add("source",""));
     assertNull(q.q()); assertNull(q.source()); assertEquals(100, q.limit());
   }
+  @Test void limitIsClampedToOneAndOneThousand() {
+    assertEquals(1, SearchQuery.fromParams(MultiMap.caseInsensitiveMultiMap().add("limit","0")).limit());
+    assertEquals(1, SearchQuery.fromParams(MultiMap.caseInsensitiveMultiMap().add("limit","-3")).limit());
+    assertEquals(1000, SearchQuery.fromParams(MultiMap.caseInsensitiveMultiMap().add("limit","5000")).limit());
+  }
+  @Test void negativeLastThrows() {
+    assertThrows(IllegalArgumentException.class,
+        () -> SearchQuery.fromParams(MultiMap.caseInsensitiveMultiMap().add("last","-1")));
+  }
 }

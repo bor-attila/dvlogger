@@ -6,6 +6,7 @@ import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
+import java.time.DateTimeException;
 
 public class ArchiveSearchHandler {
   private final ArchiveStore archive; // null when disabled
@@ -24,7 +25,13 @@ public class ArchiveSearchHandler {
   private void logs(RoutingContext rc) {
     SearchQuery q;
     try { q = SearchQuery.fromParams(rc.queryParams()); }
-    catch (Exception e) { rc.response().setStatusCode(400).end(new JsonObject().put("error", "bad query: " + e.getMessage()).encode()); return; }
-    archive.search(q).onSuccess(items -> rc.json(SearchHandler.page(items, q.limit()))).onFailure(rc::fail);
+    catch (IllegalArgumentException | DateTimeException e) {
+      rc.response().setStatusCode(400).end(new JsonObject().put("error", "bad query: " + e.getMessage()).encode()); return;
+    }
+    SearchQuery fq = q;
+    archive.search(fq).onSuccess(items -> {
+      String next = items.size() >= fq.limit() ? items.get(items.size() - 1).id() : null;
+      rc.json(SearchHandler.page(items, next));
+    }).onFailure(rc::fail);
   }
 }

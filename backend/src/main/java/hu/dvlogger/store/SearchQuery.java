@@ -9,7 +9,11 @@ public record SearchQuery(String q, Instant from, Instant to, String source, Str
   public static SearchQuery fromParams(io.vertx.core.MultiMap p) {
     Instant from = instant(p.get("from")), to = instant(p.get("to"));
     String last = blank(p.get("last"));
-    if (last != null) { from = Instant.now().minusSeconds(Long.parseLong(last) * 60); to = null; }
+    if (last != null) {
+      long lastMinutes = Long.parseLong(last);
+      if (lastMinutes < 0) throw new IllegalArgumentException("last must be >= 0");
+      from = Instant.now().minusSeconds(lastMinutes * 60); to = null;
+    }
     String lvl = blank(p.get("level"));
     String lim = blank(p.get("limit"));
     int limit = lim == null ? 100 : Integer.parseInt(lim);
