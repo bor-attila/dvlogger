@@ -1,1 +1,1 @@
-<template><div class="p-4">logs</div></template>
+<template><LogBrowser base="/api" title="Élő logok" /></template>
