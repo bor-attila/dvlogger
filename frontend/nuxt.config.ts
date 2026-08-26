@@ -8,5 +8,5 @@ export default defineNuxtConfig({
   vite: { plugins: [tailwindcss()] },
   devServer: { port: 3000 },
   nitro: { devProxy: { '/api': { target: 'http://localhost:8086/api', changeOrigin: true } } },
-  app: { head: { title: 'dvlogger' } },
+  app: { head: { title: 'dvLogger' } },
 })

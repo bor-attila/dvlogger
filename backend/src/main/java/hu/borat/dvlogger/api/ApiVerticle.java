@@ -56,6 +56,7 @@ public class ApiVerticle extends AbstractVerticle {
   protected void registerRoutes(Router router) {
     AuthHandler auth = new AuthHandler(cfg);
     auth.register(router);
+    auth.scheduleCleanup(vertx);
     new HttpIngestHandler(vertx, cfg, parser).register(router);
     router.route("/api/*").handler(auth.required());   // everything registered after this line needs login
     registerProtectedRoutes(router, auth);

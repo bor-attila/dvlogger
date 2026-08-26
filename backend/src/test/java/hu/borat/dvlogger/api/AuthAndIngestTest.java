@@ -37,6 +37,23 @@ class AuthAndIngestTest {
       .onComplete(ctx.succeeding(r -> ctx.verify(() -> { assertEquals(401, r.statusCode()); ctx.completeNow(); })));
   }
 
+  @Test void fiveFailuresBanTheIpEvenForCorrectPassword(Vertx vertx, VertxTestContext ctx) {
+    WebClientSession c = WebClientSession.create(WebClient.create(vertx));
+    JsonObject bad = new JsonObject().put("user","admin").put("password","nope");
+    JsonObject good = new JsonObject().put("user","admin").put("password","secret");
+    io.vertx.core.Future<Void> chain = vertx.deployVerticle(new ApiVerticle(cfg, null, null, null, new Stats(), Parsers.forConfig(cfg))).mapEmpty();
+    for (int i = 0; i < 5; i++)
+      chain = chain.compose(v -> c.post(18081, "localhost", "/api/login").sendJsonObject(bad))
+          .compose(r -> { ctx.verify(() -> assertEquals(401, r.statusCode())); return io.vertx.core.Future.succeededFuture(); });
+    chain.compose(v -> c.post(18081, "localhost", "/api/login").sendJsonObject(good))
+      .compose(r -> { ctx.verify(() -> {
+          assertEquals(401, r.statusCode());
+          assertEquals("bad credentials", r.bodyAsJsonObject().getString("error")); // indistinguishable from a wrong password
+        });
+        return c.get(18081, "localhost", "/api/me").send(); })
+      .onComplete(ctx.succeeding(r -> ctx.verify(() -> { assertEquals(401, r.statusCode()); ctx.completeNow(); })));
+  }
+
   @Test void malformedLoginBodyIs401(Vertx vertx, VertxTestContext ctx) {
     WebClient c = WebClient.create(vertx);
     vertx.deployVerticle(new ApiVerticle(cfg, null, null, null, new Stats(), Parsers.forConfig(cfg)))

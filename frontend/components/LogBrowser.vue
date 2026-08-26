@@ -9,7 +9,7 @@ async function onLogout() { await auth.logout(); await navigateTo('/login') }
 <template>
   <div class="flex h-screen flex-col">
     <header class="flex items-center gap-4 border-b border-zinc-800 px-3 py-2 text-sm">
-      <span class="font-semibold">dvlogger</span>
+      <span class="font-semibold">dvLogger</span>
       <NuxtLink to="/" class="hover:text-emerald-300" active-class="text-emerald-300">Élő</NuxtLink>
       <NuxtLink v-if="auth.archiveEnabled" to="/archive" class="hover:text-emerald-300" active-class="text-emerald-300">Archívum</NuxtLink>
       <span class="ml-auto text-zinc-400">{{ title }} · {{ auth.user }}</span>

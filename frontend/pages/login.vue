@@ -10,7 +10,7 @@ async function submit() {
 <template>
   <div class="flex min-h-screen items-center justify-center">
     <form class="w-80 space-y-4 rounded-lg border border-zinc-800 bg-zinc-900 p-6" @submit.prevent="submit">
-      <h1 class="text-xl font-semibold">dvlogger</h1>
+      <h1 class="text-xl font-semibold">dvLogger</h1>
       <input v-model="user" placeholder="Felhasználó" class="w-full rounded bg-zinc-800 px-3 py-2" autofocus />
       <input v-model="password" type="password" placeholder="Jelszó" class="w-full rounded bg-zinc-800 px-3 py-2" />
       <p v-if="error" class="text-sm text-red-400">{{ error }}</p>
