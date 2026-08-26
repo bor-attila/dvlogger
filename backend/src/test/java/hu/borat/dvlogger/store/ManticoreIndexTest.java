@@ -74,13 +74,10 @@ class ManticoreIndexTest {
         return ix.insertMany(List.of(nulEntry)).map(v2 -> nulEntry); })
       .compose(nulEntry -> ix.search(new SearchQuery("nul", null, null, null, null, null, 10, null))
           .map(r -> {
-            // Observed behavior (documented, not a bug): Manticore's default full-text matching
-            // is whole-token, not substring/prefix. Since NUL-stripping concatenates "nul" and
-            // "here" into a single indexed token "nulhere", the partial word "nul" alone does NOT
-            // match it -- confirming the NUL was actually removed (not left as a token separator)
-            // rather than silently dropped from the index. The stored data is proven searchable
-            // via the exact token below.
-            ctx.verify(() -> assertTrue(r.isEmpty()));
+            // NUL-stripping concatenates "nul" and "here" into the single indexed token "nulhere".
+            // Bare query words are infix-matched (*nul*), so the partial word finds that token --
+            // proving the NUL was removed rather than left as a token separator.
+            ctx.verify(() -> assertEquals(List.of(nulEntry.id()), r));
             return nulEntry;
           }))
       .compose(nulEntry -> ix.search(new SearchQuery("nulhere", null, null, null, null, null, 10, null))
@@ -94,5 +91,36 @@ class ManticoreIndexTest {
       })
       .compose(v -> ix.search(new SearchQuery(null, null, null, null, null, null, 10, null)))
       .onComplete(ctx.succeeding(r -> ctx.verify(() -> { assertTrue(r.isEmpty()); ctx.completeNow(); })));
+  }
+  @Test void partialWordsMatchViaInfix(Vertx vertx, VertxTestContext ctx) {
+    ManticoreIndex ix = new ManticoreIndex(vertx, mc.getHost(), mc.getMappedPort(9306));
+    LogEntry a = e("app", "Launching worker pool", List.of(), 6, Instant.now());
+    LogEntry b = e("app", "user login ok", List.of(), 6, Instant.now());
+    ix.init().compose(v -> ix.truncate()).compose(v -> ix.insertMany(List.of(a, b)))
+      .compose(v -> ix.search(new SearchQuery("Launc", null, null, null, null, null, 10, null)))
+      .compose(r -> { ctx.verify(() -> assertEquals(List.of(a.id()), r));           // prefix
+        return ix.search(new SearchQuery("unchi", null, null, null, null, null, 10, null)); })
+      .compose(r -> { ctx.verify(() -> assertEquals(List.of(a.id()), r));           // infix
+        return ix.search(new SearchQuery("launc pool", null, null, null, null, null, 10, null)); })
+      .compose(r -> { ctx.verify(() -> assertEquals(List.of(a.id()), r));           // all words must match, case-insensitive
+        return ix.search(new SearchQuery("\"login ok\"", null, null, null, null, null, 10, null)); })
+      .compose(r -> { ctx.verify(() -> assertEquals(List.of(b.id()), r));           // quoted phrase stays exact
+        return ix.search(new SearchQuery("\"logi ok\"", null, null, null, null, null, 10, null)); })
+      .compose(r -> { ctx.verify(() -> assertTrue(r.isEmpty()));
+        return ix.search(new SearchQuery("x", null, null, null, null, null, 10, null)); })  // 1-char token: no wildcard, no error
+      .onComplete(ctx.succeeding(r -> ctx.verify(() -> { assertTrue(r.isEmpty()); ctx.completeNow(); })));
+  }
+  @Test void accentsFoldToBaseLetters(Vertx vertx, VertxTestContext ctx) {
+    ManticoreIndex ix = new ManticoreIndex(vertx, mc.getHost(), mc.getMappedPort(9306));
+    LogEntry a = e("app", "Sikeres bejelentkezés: Árvíztűrő tükörfúrógép", List.of(), 6, Instant.now());
+    ix.init().compose(v -> ix.truncate()).compose(v -> ix.insertMany(List.of(a)))
+      .compose(v -> ix.search(new SearchQuery("bejelentkezes", null, null, null, null, null, 10, null)))
+      .compose(r -> { ctx.verify(() -> assertEquals(List.of(a.id()), r));          // unaccented query hits accented text
+        return ix.search(new SearchQuery("bejelentkezés", null, null, null, null, null, 10, null)); })
+      .compose(r -> { ctx.verify(() -> assertEquals(List.of(a.id()), r));          // accented query still works
+        return ix.search(new SearchQuery("arvizturo tukorfurogep", null, null, null, null, null, 10, null)); })
+      .compose(r -> { ctx.verify(() -> assertEquals(List.of(a.id()), r));          // á í ű ő ú ö all fold
+        return ix.search(new SearchQuery("ÁRVÍZ", null, null, null, null, null, 10, null)); })
+      .onComplete(ctx.succeeding(r -> ctx.verify(() -> { assertEquals(List.of(a.id()), r); ctx.completeNow(); })));
   }
 }

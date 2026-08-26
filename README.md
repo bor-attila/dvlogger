@@ -97,7 +97,9 @@ search uses MongoDB text/regex matching and is slower than live search on large 
 
 Live search works the other way round: Manticore answers the full-text query with document ids,
 and the matching documents are then always hydrated from MongoDB (MongoDB is the source of truth
-for the stored entry, not a fallback).
+for the stored entry, not a fallback). Bare words match partially and case-insensitively
+(`Launc` finds `Launching`, `unchi` finds it too), accents fold to base letters (`bejelentkezes`
+finds `bejelentkezés`), all words must match, and `"quoted text"` is matched as an exact phrase.
 
 ### Reindexing
 
