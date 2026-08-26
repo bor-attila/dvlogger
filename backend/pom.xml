@@ -23,7 +23,10 @@
     <dependency><groupId>io.vertx</groupId><artifactId>vertx-web</artifactId></dependency>
     <dependency><groupId>io.vertx</groupId><artifactId>vertx-mongo-client</artifactId></dependency>
     <dependency><groupId>io.vertx</groupId><artifactId>vertx-mysql-client</artifactId></dependency>
-    <dependency><groupId>org.slf4j</groupId><artifactId>slf4j-simple</artifactId><version>2.0.13</version></dependency>
+    <!-- vertx-dependencies (imported above) manages slf4j-simple at scope=test; without an
+         explicit scope here that managed scope wins even though we pin our own version, so
+         slf4j-simple (and slf4j-api) would be silently dropped from the runtime/shaded jar. -->
+    <dependency><groupId>org.slf4j</groupId><artifactId>slf4j-simple</artifactId><version>2.0.13</version><scope>compile</scope></dependency>
     <dependency><groupId>io.vertx</groupId><artifactId>vertx-junit5</artifactId><scope>test</scope></dependency>
     <dependency><groupId>io.vertx</groupId><artifactId>vertx-web-client</artifactId><scope>test</scope></dependency>
     <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>${junit.version}</version><scope>test</scope></dependency>
