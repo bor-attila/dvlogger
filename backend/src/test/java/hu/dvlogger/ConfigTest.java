@@ -37,4 +37,8 @@ class ConfigTest {
     assertThrows(IllegalStateException.class,
         () -> Config.fromEnv(Map.of("AUTH_USER","u","AUTH_PASSWORD","p","LOG_FORMAT","xml")));
   }
+  @Test void blankTextPatternIsNull() {
+    Config c = Config.fromEnv(Map.of("AUTH_USER","u","AUTH_PASSWORD","p","LOG_TEXT_PATTERN","  "));
+    assertNull(c.logTextPattern());
+  }
 }

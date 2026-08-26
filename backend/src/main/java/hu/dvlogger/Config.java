@@ -18,7 +18,7 @@ public record Config(String authUser, String authPassword, boolean archiveEnable
     return new Config(user, pass,
         Boolean.parseBoolean(env.getOrDefault("ARCHIVE_ENABLED", "false")),
         format,
-        env.get("LOG_TEXT_PATTERN"),
+        blankToNull(env.get("LOG_TEXT_PATTERN")),
         intOf(env, "RETENTION_DAYS", 14),
         env.getOrDefault("MONGO_URL", "mongodb://mongo:27017/dvlogger"),
         env.getOrDefault("MANTICORE_HOST", "manticore"),

@@ -33,4 +33,11 @@ class AutoParserTest {
     assertEquals("10.0.0.1", e.source());
     assertEquals(List.of(), e.tags());
   }
+  @Test void blankPatternEnvStillParsesTextPrefix() {
+    LogParser parser = Parsers.forConfig(Config.fromEnv(Map.of("AUTH_USER","u","AUTH_PASSWORD","p","LOG_TEXT_PATTERN","")));
+    LogEntry e = parser.parse("app1 [web,prod] hello from tcp", "1.2.3.4");
+    assertEquals("app1", e.source());
+    assertEquals(List.of("web","prod"), e.tags());
+    assertEquals("hello from tcp", e.message());
+  }
 }
