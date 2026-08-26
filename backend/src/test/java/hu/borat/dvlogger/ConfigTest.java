@@ -8,7 +8,7 @@ class ConfigTest {
   @Test void defaultsApplyWhenEnvEmpty() {
     Config c = Config.fromEnv(Map.of("AUTH_USER", "admin", "AUTH_PASSWORD", "pw"));
     assertEquals("admin", c.authUser());
-    assertFalse(c.archiveEnabled());
+    assertTrue(c.archiveEnabled());
     assertEquals("auto", c.logFormat());
     assertEquals(14, c.retentionDays());
     assertEquals("mongodb://mongo:27017/dvlogger", c.mongoUrl());
@@ -19,7 +19,7 @@ class ConfigTest {
     assertNull(c.ingestToken());
     assertEquals(500, c.batchSize());
     assertEquals(200, c.batchMs());
-    assertFalse(c.reindexOnStart());
+    assertTrue(c.reindexOnStart());
   }
   @Test void envOverrides() {
     Config c = Config.fromEnv(Map.of("AUTH_USER","u","AUTH_PASSWORD","p","ARCHIVE_ENABLED","true",

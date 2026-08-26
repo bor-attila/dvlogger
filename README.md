@@ -74,9 +74,9 @@ All variables below can be set in `.env` (copied from `.env.example`); container
 | `AUTH_PASSWORD` | `admin` | Dashboard/API login password — **change this** |
 | `LOG_FORMAT` | `auto` | Ingest parser: `text` \| `json` \| `gelf` \| `auto` (auto-detect per message) |
 | `LOG_TEXT_PATTERN` | *(built-in default)* | Regex for the `text` parser, with named groups `source`, `tags`, `message` |
-| `ARCHIVE_ENABLED` | `false` | Also write every entry to a permanent, non-expiring archive collection |
+| `ARCHIVE_ENABLED` | `true` | Also write every entry to a permanent, non-expiring archive collection |
 | `RETENTION_DAYS` | `14` | TTL for the primary (non-archive) log collection, in days |
-| `REINDEX_ON_START` | `false` | On startup, rebuild the Manticore search index from MongoDB |
+| `REINDEX_ON_START` | `true` | On startup, rebuild the Manticore search index from MongoDB |
 | `INGEST_TOKEN` | *(unset)* | If set, `POST /api/ingest` requires header `X-Ingest-Token: <value>` |
 | `BATCH_SIZE` | `500` | Max entries per write batch (Mongo + Manticore) |
 | `BATCH_MS` | `200` | Max time (ms) to wait before flushing a partial batch |

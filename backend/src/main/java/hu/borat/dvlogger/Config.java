@@ -16,7 +16,7 @@ public record Config(String authUser, String authPassword, boolean archiveEnable
     String format = env.getOrDefault("LOG_FORMAT", "auto").toLowerCase();
     if (!FORMATS.contains(format)) throw new IllegalStateException("LOG_FORMAT must be one of " + FORMATS);
     return new Config(user, pass,
-        Boolean.parseBoolean(env.getOrDefault("ARCHIVE_ENABLED", "false")),
+        Boolean.parseBoolean(env.getOrDefault("ARCHIVE_ENABLED", "true")),
         format,
         blankToNull(env.get("LOG_TEXT_PATTERN")),
         intOf(env, "RETENTION_DAYS", 14),
@@ -28,7 +28,7 @@ public record Config(String authUser, String authPassword, boolean archiveEnable
         blankToNull(env.get("INGEST_TOKEN")),
         intOf(env, "BATCH_SIZE", 500),
         intOf(env, "BATCH_MS", 200),
-        Boolean.parseBoolean(env.getOrDefault("REINDEX_ON_START", "false")));
+        Boolean.parseBoolean(env.getOrDefault("REINDEX_ON_START", "true")));
   }
 
   private static String required(Map<String, String> env, String key) {
