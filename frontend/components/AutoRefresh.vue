@@ -1,6 +1,10 @@
 <script setup lang="ts">
 const logs = useLogsStore()
 const emit = defineEmits<{ tick: [] }>()
+const options = [
+  { value: 0, label: 'off' }, { value: 5, label: '5 s' }, { value: 10, label: '10 s' },
+  { value: 30, label: '30 s' }, { value: 60, label: '60 s' },
+]
 let timer: ReturnType<typeof setInterval> | null = null
 watch(() => logs.refreshSec, (sec) => {
   if (timer) clearInterval(timer); timer = null
@@ -9,11 +13,5 @@ watch(() => logs.refreshSec, (sec) => {
 onUnmounted(() => { if (timer) clearInterval(timer) })
 </script>
 <template>
-  <label class="flex items-center gap-1 text-zinc-400">
-    Refresh
-    <select v-model.number="logs.refreshSec" class="rounded bg-zinc-800 px-2 py-1.5 text-zinc-100">
-      <option :value="0">off</option><option :value="5">5 s</option><option :value="10">10 s</option>
-      <option :value="30">30 s</option><option :value="60">60 s</option>
-    </select>
-  </label>
+  <SelectBox v-model="logs.refreshSec" :options="options" label="Refresh" />
 </template>

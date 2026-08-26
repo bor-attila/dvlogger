@@ -7,18 +7,22 @@ watch(() => props.base, async () => { logs.reset(); await logs.loadFacets(props.
 async function onLogout() { await auth.logout(); await navigateTo('/login') }
 </script>
 <template>
-  <div class="flex h-screen flex-col">
-    <header class="flex items-center gap-4 border-b border-zinc-800 px-3 py-2 text-sm">
-      <span class="font-semibold">dvLogger</span>
-      <NuxtLink to="/" class="hover:text-emerald-300" active-class="text-emerald-300">Live</NuxtLink>
-      <NuxtLink v-if="auth.archiveEnabled" to="/archive" class="hover:text-emerald-300" active-class="text-emerald-300">Archive</NuxtLink>
-      <span class="ml-auto text-zinc-400">{{ title }} · {{ auth.user }}</span>
-      <button class="text-zinc-400 hover:text-zinc-100" @click="onLogout">Log out</button>
+  <div class="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-5 px-6 py-8 lg:px-10">
+    <header class="flex items-center gap-6 rounded-xl border border-zinc-800 bg-zinc-900/60 px-6 py-4">
+      <span class="text-lg font-semibold tracking-tight">dv<span class="text-emerald-400">Logger</span></span>
+      <nav class="flex items-center gap-1 text-sm">
+        <NuxtLink to="/" class="rounded-lg px-3 py-1.5 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100"
+                  active-class="!bg-zinc-800 !text-emerald-300">Live</NuxtLink>
+        <NuxtLink v-if="auth.archiveEnabled" to="/archive" class="rounded-lg px-3 py-1.5 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100"
+                  active-class="!bg-zinc-800 !text-emerald-300">Archive</NuxtLink>
+      </nav>
+      <div class="ml-auto flex items-center gap-4 text-sm">
+        <span class="text-zinc-500">{{ title }} · <span class="text-zinc-300">{{ auth.user }}</span></span>
+        <button class="rounded-lg border border-zinc-800 px-3 py-1.5 text-zinc-400 transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100" @click="onLogout">Log out</button>
+      </div>
     </header>
     <FilterBar @search="search" />
-    <div class="flex min-h-0 flex-1">
-      <LogTable @more="logs.loadMore(base)" />
-      <LogDetailPanel />
-    </div>
+    <LogTable @more="logs.loadMore(base)" />
+    <LogDetailModal />
   </div>
 </template>
