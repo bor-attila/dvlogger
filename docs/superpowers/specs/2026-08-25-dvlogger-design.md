@@ -31,7 +31,7 @@ dvlogger/
   .env.example
   backend/                    # Maven, Vert.x
     Dockerfile                # multi-stage: node build (frontend) + maven build + JRE runtime
-    src/main/java/hu/dvlogger/
+    src/main/java/hu/borat/dvlogger/
       Main.java               # deploy verticle-k, Config betöltés
       Config.java             # env → record
       model/LogEntry.java     # id, ts, source, tags[], level, message, raw(JSON), host

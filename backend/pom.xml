@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>hu.borat.dvlogger</groupId>
+  <artifactId>dvlogger</artifactId>
+  <version>0.1.0</version>
+  <properties>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <vertx.version>4.5.10</vertx.version>
+    <junit.version>5.10.2</junit.version>
+    <testcontainers.version>1.21.3</testcontainers.version>
+  </properties>
+  <dependencyManagement>
+    <dependencies>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-stack-depchain</artifactId><version>${vertx.version}</version><type>pom</type><scope>import</scope></dependency>
+      <dependency><groupId>org.testcontainers</groupId><artifactId>testcontainers-bom</artifactId><version>${testcontainers.version}</version><type>pom</type><scope>import</scope></dependency>
+    </dependencies>
+  </dependencyManagement>
+  <dependencies>
+    <dependency><groupId>io.vertx</groupId><artifactId>vertx-core</artifactId></dependency>
+    <dependency><groupId>io.vertx</groupId><artifactId>vertx-web</artifactId></dependency>
+    <dependency><groupId>io.vertx</groupId><artifactId>vertx-mongo-client</artifactId></dependency>
+    <dependency><groupId>io.vertx</groupId><artifactId>vertx-mysql-client</artifactId></dependency>
+    <!-- vertx-dependencies (imported above) manages slf4j-simple at scope=test; without an
+         explicit scope here that managed scope wins even though we pin our own version, so
+         slf4j-simple (and slf4j-api) would be silently dropped from the runtime/shaded jar. -->
+    <dependency><groupId>org.slf4j</groupId><artifactId>slf4j-simple</artifactId><version>2.0.13</version><scope>compile</scope></dependency>
+    <dependency><groupId>io.vertx</groupId><artifactId>vertx-junit5</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>io.vertx</groupId><artifactId>vertx-web-client</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>${junit.version}</version><scope>test</scope></dependency>
+    <dependency><groupId>org.testcontainers</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.testcontainers</groupId><artifactId>mongodb</artifactId><scope>test</scope></dependency>
+  </dependencies>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.2.5</version>
+        <configuration>
+          <!-- Testcontainers' initial Docker probe hardcodes API 1.32 when unset, which modern
+               Docker Engines (min API 1.44+) reject outright. Pinning a modern version here lets
+               the probe succeed; real request/response still negotiates normally. -->
+          <systemPropertyVariables>
+            <api.version>1.44</api.version>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId><artifactId>maven-shade-plugin</artifactId><version>3.5.3</version>
+        <executions><execution><phase>package</phase><goals><goal>shade</goal></goals>
+          <configuration>
+            <finalName>dvlogger</finalName>
+            <transformers>
+              <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer"><mainClass>hu.borat.dvlogger.Main</mainClass></transformer>
+              <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+            </transformers>
+          </configuration>
+        </execution></executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

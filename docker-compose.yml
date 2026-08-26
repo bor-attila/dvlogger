@@ -1,0 +1,37 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "${HTTP_PORT_HOST:-8086}:8080"
+      - "${INGEST_PORT_HOST:-11222}:11222/tcp"
+      - "${INGEST_PORT_HOST:-11222}:11222/udp"
+    environment:
+      AUTH_USER: ${AUTH_USER:-admin}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-admin}
+      LOG_FORMAT: ${LOG_FORMAT:-auto}
+      LOG_TEXT_PATTERN: ${LOG_TEXT_PATTERN:-}
+      ARCHIVE_ENABLED: ${ARCHIVE_ENABLED:-false}
+      RETENTION_DAYS: ${RETENTION_DAYS:-14}
+      INGEST_TOKEN: ${INGEST_TOKEN:-}
+      BATCH_SIZE: ${BATCH_SIZE:-500}
+      BATCH_MS: ${BATCH_MS:-200}
+      REINDEX_ON_START: ${REINDEX_ON_START:-false}
+      MONGO_URL: mongodb://mongo:27017/dvlogger
+      MANTICORE_HOST: manticore
+      MANTICORE_PORT: "9306"
+    depends_on: [mongo, manticore]
+    restart: unless-stopped
+  mongo:
+    image: mongo:7
+    volumes: [mongo-data:/data/db]
+    restart: unless-stopped
+  manticore:
+    image: manticoresearch/manticore:6.3.6
+    volumes: [manticore-data:/var/lib/manticore]
+    ulimits: { nofile: { soft: 65536, hard: 65536 } }
+    restart: unless-stopped
+volumes:
+  mongo-data:
+  manticore-data:

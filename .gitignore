@@ -1,0 +1,9 @@
+.superpowers/
+backend/target/
+backend/src/main/resources/webroot/
+backend/dependency-reduced-pom.xml
+frontend/node_modules/
+frontend/.nuxt/
+frontend/.output/
+frontend/dist/
+.env
