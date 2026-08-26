@@ -1,6 +1,7 @@
 package hu.dvlogger.api;
 
 import hu.dvlogger.Config;
+import hu.dvlogger.ingest.HttpIngestHandler;
 import hu.dvlogger.ingest.parser.LogParser;
 import hu.dvlogger.store.ArchiveStore;
 import hu.dvlogger.store.ManticoreIndex;
@@ -8,10 +9,13 @@ import hu.dvlogger.store.MongoStore;
 import hu.dvlogger.store.Stats;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
+import io.vertx.core.http.CookieSameSite;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.ext.web.handler.SessionHandler;
 import io.vertx.ext.web.handler.StaticHandler;
+import io.vertx.ext.web.sstore.LocalSessionStore;
 
 public class ApiVerticle extends AbstractVerticle {
   private final Config cfg;
@@ -32,6 +36,8 @@ public class ApiVerticle extends AbstractVerticle {
     router.get("/api/health").handler(rc -> rc.json(new JsonObject()
         .put("status", "ok").put("archiveEnabled", cfg.archiveEnabled())
         .put("stats", stats == null ? new JsonObject() : stats.toJson())));
+    router.route().handler(SessionHandler.create(LocalSessionStore.create(vertx))
+        .setCookieHttpOnlyFlag(true).setCookieSameSite(CookieSameSite.STRICT));
     registerRoutes(router);
     router.route("/*").handler(StaticHandler.create("webroot").setIndexPage("index.html"));
     // SPA fallback: unknown non-API paths serve index.html
@@ -43,6 +49,13 @@ public class ApiVerticle extends AbstractVerticle {
         .<Void>mapEmpty().onComplete(start);
   }
 
-  /** Extended by later tasks (auth, search, ingest). */
-  protected void registerRoutes(Router router) { }
+  protected void registerRoutes(Router router) {
+    AuthHandler auth = new AuthHandler(cfg);
+    auth.register(router);
+    new HttpIngestHandler(vertx, cfg, parser).register(router);
+    router.route("/api/*").handler(auth.required());   // everything registered after this line needs login
+    registerProtectedRoutes(router, auth);
+  }
+  /** Search routes (Task 10). */
+  protected void registerProtectedRoutes(Router router, AuthHandler auth) { }
 }
