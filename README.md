@@ -11,7 +11,7 @@ dvlogger ("dev logger") is a minimal, Graylog-like log platform for development 
 - **Ingest** free-text, JSON, or GELF log lines over TCP, UDP, or HTTP on a single port (`11222`).
 - **Store** every entry in MongoDB, with an optional permanent archive collection.
 - **Search** full text via Manticore Search; matches are hydrated from MongoDB, the source of truth.
-- **Browse** everything from a small Nuxt dashboard, served by the same backend on `8080`.
+- **Browse** everything from a small Nuxt dashboard, served by the same backend, exposed on host port `8086`.
 
 ## Quick start
 
@@ -21,9 +21,9 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Then open http://localhost:8080 and log in with the user/password from `.env`.
+Then open http://localhost:8086 and log in with the user/password from `.env`.
 
-If ports `8080` or `11222` are already used on your machine, override the host-side mapping
+If ports `8086` or `11222` are already used on your machine, override the host-side mapping
 without touching the container internals:
 
 ```bash
@@ -47,7 +47,7 @@ echo '{"version":"1.1","host":"h","short_message":"hello from udp gelf","level":
 **JSON over HTTP:**
 
 ```bash
-curl -s -X POST localhost:8080/api/ingest -d '{"message":"hello from http","source":"curl","tags":["x"]}'
+curl -s -X POST localhost:8086/api/ingest -d '{"message":"hello from http","source":"curl","tags":["x"]}'
 ```
 
 ### Text line format
@@ -80,7 +80,7 @@ All variables below can be set in `.env` (copied from `.env.example`); container
 | `INGEST_TOKEN` | *(unset)* | If set, `POST /api/ingest` requires header `X-Ingest-Token: <value>` |
 | `BATCH_SIZE` | `500` | Max entries per write batch (Mongo + Manticore) |
 | `BATCH_MS` | `200` | Max time (ms) to wait before flushing a partial batch |
-| `HTTP_PORT_HOST` | `8080` | Host port mapped to the dashboard/API (container port stays `8080`) |
+| `HTTP_PORT_HOST` | `8086` | Host port mapped to the dashboard/API (container port stays `8080`) |
 | `INGEST_PORT_HOST` | `11222` | Host port mapped to TCP/UDP ingest (container port stays `11222`) |
 
 ### Archive mode
@@ -110,8 +110,8 @@ losing the `manticore-data` volume) — it does not touch or require the archive
 Testcontainers, so a working Docker daemon is required locally.
 
 **Frontend** (`frontend/`, Nuxt 3): `npm run dev` starts the dev server on port `3000` and
-proxies `/api` to `http://localhost:8080` (hardcoded in `nuxt.config.ts`'s `nitro.devProxy`),
-so run a backend on the default port `8080` first (e.g. `docker compose up -d` with default
+proxies `/api` to `http://localhost:8086` (hardcoded in `nuxt.config.ts`'s `nitro.devProxy`),
+so run a backend on the default host port `8086` first (e.g. `docker compose up -d` with default
 ports, or `HTTP_PORT_HOST` left unset).
 
 ## Throughput / UDP tuning

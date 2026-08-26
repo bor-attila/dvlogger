@@ -7,6 +7,6 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
   vite: { plugins: [tailwindcss()] },
   devServer: { port: 3000 },
-  nitro: { devProxy: { '/api': { target: 'http://localhost:8080/api', changeOrigin: true } } },
+  nitro: { devProxy: { '/api': { target: 'http://localhost:8086/api', changeOrigin: true } } },
   app: { head: { title: 'dvlogger' } },
 })

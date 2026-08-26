@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Usage: scripts/loadgen.sh [host] [ingest_port] [msgs_per_worker] [workers] [http_port]
 # Sends text-format lines over UDP using GNU parallel.
-HOST=${1:-localhost}; PORT=${2:-11222}; N=${3:-20000}; W=${4:-8}; HTTP_PORT=${5:-8080}
+HOST=${1:-localhost}; PORT=${2:-11222}; N=${3:-20000}; W=${4:-8}; HTTP_PORT=
 worker() {
   local id=$1
   for ((i=0; i<N; i++)); do

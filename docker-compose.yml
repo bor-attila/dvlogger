@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     ports:
-      - "${HTTP_PORT_HOST:-8080}:8080"
+      - "${HTTP_PORT_HOST:-8086}:8080"
       - "${INGEST_PORT_HOST:-11222}:11222/tcp"
       - "${INGEST_PORT_HOST:-11222}:11222/udp"
     environment:
