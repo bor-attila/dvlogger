@@ -18,7 +18,7 @@ const close = () => { logs.selected = null }
           <TransitionChild as="template" enter="duration-150 ease-out" enter-from="opacity-0 scale-95" enter-to="opacity-100 scale-100"
                            leave="duration-100 ease-in" leave-from="opacity-100 scale-100" leave-to="opacity-0 scale-95">
             <DialogPanel v-if="logs.selected"
-                         class="w-full max-w-3xl rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl shadow-black/50">
+                         class="w-full max-w-3xl rounded-2xl border border-zinc-800 bg-zinc-900 p-6 text-zinc-100 shadow-2xl shadow-black/50">
               <div class="mb-5 flex items-start justify-between gap-4">
                 <div>
                   <DialogTitle class="text-base font-semibold">Log entry</DialogTitle>
