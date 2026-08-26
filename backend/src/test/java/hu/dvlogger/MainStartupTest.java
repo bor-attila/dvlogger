@@ -92,6 +92,42 @@ class MainStartupTest {
     fail("dvlogger never answered /api/health: " + last);
   }
 
+  /**
+   * SIGTERM (what `docker compose stop` sends) must undeploy the verticles -- letting
+   * WriterVerticle flush its buffer -- instead of killing the JVM outright.
+   */
+  @Test @Timeout(90)
+  void sigtermShutsDownGracefully() throws Exception {
+    int httpPort = freePort();
+    int ingestPort = freePort();
+    java.io.File out = java.io.File.createTempFile("dvlogger-shutdown", ".log");
+    out.deleteOnExit();
+    ProcessBuilder pb = new ProcessBuilder("java", "-cp", System.getProperty("java.class.path"), "hu.dvlogger.Main");
+    pb.environment().put("AUTH_USER", "a");
+    pb.environment().put("AUTH_PASSWORD", "b");
+    pb.environment().put("MONGO_URL", mongo.getConnectionString() + "/dvlogger");
+    pb.environment().put("MANTICORE_HOST", manticore.getHost());
+    pb.environment().put("MANTICORE_PORT", String.valueOf(manticore.getMappedPort(9306)));
+    pb.environment().put("HTTP_PORT", String.valueOf(httpPort));
+    pb.environment().put("INGEST_PORT", String.valueOf(ingestPort));
+    pb.redirectErrorStream(true);
+    pb.redirectOutput(out);
+    process = pb.start();
+
+    // Wait until it is fully up before signalling it.
+    boolean up = false;
+    for (int i = 0; i < 60 && process.isAlive(); i++) {
+      if (java.nio.file.Files.readString(out.toPath()).contains("dvlogger up")) { up = true; break; }
+      Thread.sleep(500);
+    }
+    assertTrue(up, "dvlogger never started: " + java.nio.file.Files.readString(out.toPath()));
+
+    process.destroy(); // SIGTERM
+    assertTrue(process.waitFor(20, java.util.concurrent.TimeUnit.SECONDS), "process did not exit after SIGTERM");
+    String log = java.nio.file.Files.readString(out.toPath());
+    assertTrue(log.contains("dvlogger shutdown complete"), "no graceful-shutdown line in output:\n" + log);
+  }
+
   private static int freePort() throws IOException {
     try (ServerSocket s = new ServerSocket(0)) { return s.getLocalPort(); }
   }

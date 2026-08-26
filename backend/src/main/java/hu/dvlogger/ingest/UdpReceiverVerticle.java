@@ -4,6 +4,7 @@ import hu.dvlogger.Config;
 import hu.dvlogger.ingest.parser.LogParser;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.datagram.DatagramSocketOptions;
 
 public class UdpReceiverVerticle extends AbstractVerticle {
@@ -17,7 +18,13 @@ public class UdpReceiverVerticle extends AbstractVerticle {
       .handler(packet -> {
         String ip = packet.sender().hostAddress();
         assembler.offer(packet.data(), System.currentTimeMillis()).ifPresent(full -> {
-          String line = Ingest.decompress(full).toString().replace("\0", "").strip();
+          Buffer data = Ingest.decompress(full);
+          if (data == null) { // zip bomb guard: inflated payload over Ingest.MAX_DECOMPRESSED
+            System.err.println("udp ingest: decompressed payload over " + Ingest.MAX_DECOMPRESSED
+                + " bytes, dropping message from " + ip);
+            return;
+          }
+          String line = data.toString().replace("\0", "").strip();
           if (!line.isEmpty()) vertx.eventBus().send(Ingest.ADDRESS, parser.parse(line, ip).toMongo());
         });
       })

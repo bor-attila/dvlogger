@@ -31,4 +31,22 @@ class GelfChunkAssemblerTest {
     try (var gz = new java.util.zip.GZIPOutputStream(bos)) { gz.write("zipped".getBytes()); }
     assertEquals("zipped", Ingest.decompress(Buffer.buffer(bos.toByteArray())).toString());
   }
+  static Buffer gzipOf(byte[] data) throws Exception {
+    java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+    try (var gz = new java.util.zip.GZIPOutputStream(bos)) { gz.write(data); }
+    return Buffer.buffer(bos.toByteArray());
+  }
+  @Test void moderatePayloadRoundTrips() throws Exception {
+    byte[] data = new byte[10 * 1024];
+    java.util.Arrays.fill(data, (byte) 'x');
+    Buffer out = Ingest.decompress(gzipOf(data));
+    assertNotNull(out);
+    assertEquals(data.length, out.length());
+  }
+  /** Zip bomb guard: a few KB of gzip inflating past the cap must be rejected, not buffered. */
+  @Test void oversizedDecompressionIsRejected() throws Exception {
+    Buffer bomb = gzipOf(new byte[3 * 1024 * 1024]);
+    assertTrue(bomb.length() < 64 * 1024, "test payload should be small on the wire");
+    assertNull(Ingest.decompress(bomb));
+  }
 }

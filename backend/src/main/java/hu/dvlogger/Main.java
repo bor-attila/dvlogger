@@ -23,6 +23,17 @@ public class Main {
     Stats stats = new Stats();
     LogParser parser = Parsers.forConfig(cfg);
 
+    // docker compose stop / systemd send SIGTERM; without a hook the JVM dies immediately and
+    // WriterVerticle.stop() (which flushes the write buffer) never runs.
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+      try {
+        vertx.close().toCompletionStage().toCompletableFuture().get(15, java.util.concurrent.TimeUnit.SECONDS);
+      } catch (Exception e) {
+        System.err.println("shutdown: " + e);
+      }
+      System.out.println("dvlogger shutdown complete");
+    }, "dvlogger-shutdown"));
+
     Future<String> startup = retry(() -> mongo.init().compose(v -> archive == null ? Future.succeededFuture() : archive.init()).compose(v -> index.init()), 30, vertx)
       .compose(v -> cfg.reindexOnStart() ? reindex(mongo, index) : Future.succeededFuture())
       .compose(v -> vertx.deployVerticle(new WriterVerticle(cfg, mongo, archive, index, stats)))

@@ -83,6 +83,68 @@ class MongoStoresTest {
       .onComplete(ctx.succeeding(r -> ctx.verify(() -> { assertEquals("payment failed", r.get(0).message()); ctx.completeNow(); })));
   }
 
+  private static JsonObject ttlIndex(io.vertx.core.json.JsonArray indexes) {
+    for (int i = 0; i < indexes.size(); i++) {
+      JsonObject idx = indexes.getJsonObject(i);
+      if ("ts_ttl".equals(idx.getString("name"))) return idx;
+    }
+    return null;
+  }
+  private static long ttlCount(io.vertx.core.json.JsonArray indexes) {
+    return indexes.stream().map(o -> (JsonObject) o).filter(o -> "ts_ttl".equals(o.getString("name"))).count();
+  }
+
+  /** init() used to drop and rebuild the TTL index on every startup (minutes of index build on a
+   * big collection); it must now leave an up-to-date index alone and use collMod to change it. */
+  @Test void initIsIdempotentAndUpdatesTtlViaCollMod(VertxTestContext ctx) {
+    MongoStore s14 = new MongoStore(client, 14), s3 = new MongoStore(client, 3);
+    s14.init()
+      .compose(v -> client.listIndexes(MongoStore.COLL))
+      .compose(idx -> {
+        ctx.verify(() -> {
+          JsonObject ttl = ttlIndex(idx);
+          assertNotNull(ttl, "ts_ttl index missing");
+          assertEquals(14L * 86400L, ttl.getNumber("expireAfterSeconds").longValue());
+          assertEquals(new JsonObject().put("ts", 1), ttl.getJsonObject("key"));
+        });
+        return s3.init();
+      })
+      .compose(v -> client.listIndexes(MongoStore.COLL))
+      .compose(idx -> {
+        ctx.verify(() -> {
+          assertEquals(1L, ttlCount(idx), "TTL index duplicated");
+          JsonObject ttl = ttlIndex(idx);
+          assertEquals(259200L, ttl.getNumber("expireAfterSeconds").longValue());
+          assertEquals(new JsonObject().put("ts", 1), ttl.getJsonObject("key"), "index key spec changed");
+        });
+        return s3.init();
+      })
+      .compose(v -> client.listIndexes(MongoStore.COLL))
+      .compose(idx -> {
+        ctx.verify(() -> {
+          assertEquals(1L, ttlCount(idx));
+          assertEquals(259200L, ttlIndex(idx).getNumber("expireAfterSeconds").longValue());
+        });
+        return s14.init(); // leave the shared collection on the default retention
+      })
+      .onComplete(ctx.succeedingThenComplete());
+  }
+
+  /** forEachBatch used to nest one compose per page, so the chain unwound synchronously at the end
+   * and blew the stack on a big collection. 2000 single-document pages exercise that (each page is
+   * a Mongo round trip, so this is the practical limit for test runtime). */
+  @Test @io.vertx.junit5.Timeout(value = 120, timeUnit = java.util.concurrent.TimeUnit.SECONDS)
+  void forEachBatchIteratesManyPagesWithoutStackOverflow(VertxTestContext ctx) {
+    MongoStore s = new MongoStore(client, 14);
+    int n = 2000;
+    List<LogEntry> es = new java.util.ArrayList<>();
+    for (int i = 0; i < n; i++) es.add(entry("s", "m" + i, List.of(), Instant.now()));
+    java.util.concurrent.atomic.AtomicInteger seen = new java.util.concurrent.atomic.AtomicInteger();
+    s.insertMany(es)
+      .compose(v -> s.forEachBatch(1, batch -> { seen.addAndGet(batch.size()); return Future.succeededFuture(); }))
+      .onComplete(ctx.succeeding(v -> ctx.verify(() -> { assertEquals(n, seen.get()); ctx.completeNow(); })));
+  }
+
   @Test void archiveRegexWhenQuoted(VertxTestContext ctx) {
     ArchiveStore ar = new ArchiveStore(client);
     ar.init().compose(v -> ar.insertMany(List.of(entry("s","abcXYZdef",List.of(),Instant.now()))))
