@@ -10,10 +10,10 @@ async function onLogout() { await auth.logout(); await navigateTo('/login') }
   <div class="flex h-screen flex-col">
     <header class="flex items-center gap-4 border-b border-zinc-800 px-3 py-2 text-sm">
       <span class="font-semibold">dvLogger</span>
-      <NuxtLink to="/" class="hover:text-emerald-300" active-class="text-emerald-300">Élő</NuxtLink>
-      <NuxtLink v-if="auth.archiveEnabled" to="/archive" class="hover:text-emerald-300" active-class="text-emerald-300">Archívum</NuxtLink>
+      <NuxtLink to="/" class="hover:text-emerald-300" active-class="text-emerald-300">Live</NuxtLink>
+      <NuxtLink v-if="auth.archiveEnabled" to="/archive" class="hover:text-emerald-300" active-class="text-emerald-300">Archive</NuxtLink>
       <span class="ml-auto text-zinc-400">{{ title }} · {{ auth.user }}</span>
-      <button class="text-zinc-400 hover:text-zinc-100" @click="onLogout">Kilépés</button>
+      <button class="text-zinc-400 hover:text-zinc-100" @click="onLogout">Log out</button>
     </header>
     <FilterBar @search="search" />
     <div class="flex min-h-0 flex-1">

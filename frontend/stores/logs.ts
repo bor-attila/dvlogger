@@ -30,7 +30,7 @@ export const useLogsStore = defineStore('logs', {
         const r = await useApi().get<{ items: LogItem[]; next: string | null }>(`${base}/logs`, this.query)
         this.items = r.items; this.next = r.next
         if (this.selected && !this.items.some(i => i.id === this.selected!.id)) this.selected = null
-      } catch (e: any) { this.error = e?.data?.error ?? 'Hiba a lekérdezésben' }
+      } catch (e: any) { this.error = e?.data?.error ?? 'Error running the query' }
       finally { this.loading = false }
     },
     async loadMore(base: string) {
@@ -39,7 +39,7 @@ export const useLogsStore = defineStore('logs', {
       try {
         const r = await useApi().get<{ items: LogItem[]; next: string | null }>(`${base}/logs`, { ...this.query, before: this.next })
         this.items.push(...r.items); this.next = r.next
-      } catch (e: any) { this.error = e?.data?.error ?? 'Hiba a további sorok betöltésekor' }
+      } catch (e: any) { this.error = e?.data?.error ?? 'Error loading more rows' }
       finally { this.loading = false }
     },
     async loadFacets(base: string) {

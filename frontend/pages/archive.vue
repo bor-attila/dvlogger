@@ -1,1 +1,1 @@
-<template><LogBrowser base="/api/archive" title="Archívum" /></template>
+<template><LogBrowser base="/api/archive" title="Archive" /></template>

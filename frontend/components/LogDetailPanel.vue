@@ -4,7 +4,7 @@ const pretty = computed(() => logs.selected ? JSON.stringify(logs.selected.raw, 
 </script>
 <template>
   <aside v-if="logs.selected" class="w-[28rem] shrink-0 overflow-auto border-l border-zinc-800 bg-zinc-900 p-3 text-xs">
-    <div class="mb-2 flex items-center justify-between"><h2 class="font-semibold">Részletek</h2>
+    <div class="mb-2 flex items-center justify-between"><h2 class="font-semibold">Details</h2>
       <button class="text-zinc-400 hover:text-zinc-100" @click="logs.selected = null">✕</button></div>
     <dl class="mb-3 grid grid-cols-[6rem_1fr] gap-y-1">
       <dt class="text-zinc-400">id</dt><dd class="break-all font-mono">{{ logs.selected.id }}</dd>

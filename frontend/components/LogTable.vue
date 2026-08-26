@@ -12,7 +12,7 @@ const select = (i: LogItem) => { logs.selected = logs.selected?.id === i.id ? nu
     <p v-if="logs.error" class="p-3 text-red-400">{{ logs.error }}</p>
     <table class="w-full">
       <thead class="sticky top-0 bg-zinc-900 text-left text-zinc-400"><tr>
-        <th class="px-2 py-1">Idő</th><th class="px-2 py-1">Szint</th><th class="px-2 py-1">Forrás</th><th class="px-2 py-1">Tagek</th><th class="px-2 py-1">Üzenet</th>
+        <th class="px-2 py-1">Time</th><th class="px-2 py-1">Level</th><th class="px-2 py-1">Source</th><th class="px-2 py-1">Tags</th><th class="px-2 py-1">Message</th>
       </tr></thead>
       <tbody>
         <tr v-for="i in logs.items" :key="i.id" class="cursor-pointer border-t border-zinc-800/60 hover:bg-zinc-900"
@@ -25,9 +25,9 @@ const select = (i: LogItem) => { logs.selected = logs.selected?.id === i.id ? nu
         </tr>
       </tbody>
     </table>
-    <p v-if="!logs.loading && !logs.items.length" class="p-4 text-zinc-500">Nincs találat.</p>
+    <p v-if="!logs.loading && !logs.items.length" class="p-4 text-zinc-500">No results.</p>
     <div class="p-3 text-center">
-      <button v-if="logs.next" class="rounded bg-zinc-800 px-3 py-1 hover:bg-zinc-700" :disabled="logs.loading" @click="emit('more')">Továbbiak</button>
+      <button v-if="logs.next" class="rounded bg-zinc-800 px-3 py-1 hover:bg-zinc-700" :disabled="logs.loading" @click="emit('more')">Load more</button>
     </div>
   </div>
 </template>
