@@ -14,7 +14,9 @@ public class GelfParser implements LogParser {
     if (!looksLikeGelf(o)) return LogEntry.unparsed(raw, remoteIp);
     String host = o.getString("host", remoteIp);
     String source = JsonParser.firstString(o, host, "_source");
-    return LogEntry.of(JsonParser.tsOf(o.getValue("timestamp")), source, JsonParser.tagsOf(o.getValue("_tags")),
+    Object tags = o.getValue("_tags");
+    if (tags == null) tags = o.getValue("_tag"); // Docker's gelf log driver sends a single "_tag" field
+    return LogEntry.of(JsonParser.tsOf(o.getValue("timestamp")), source, JsonParser.tagsOf(tags),
         JsonParser.levelOf(o.getValue("level")), o.getString("short_message"), host, o);
   }
 }

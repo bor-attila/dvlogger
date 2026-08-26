@@ -25,6 +25,10 @@ class GelfParserTest {
     assertEquals(List.of("t"), e.tags());
     assertNull(e.level());
   }
+  @Test void dockerGelfDriverSingularTagFallback() {
+    LogEntry e = p.parse("{\"version\":\"1.1\",\"host\":\"saturn\",\"short_message\":\"x\",\"_tag\":\"nginx\"}", "ip");
+    assertEquals(List.of("nginx"), e.tags());
+  }
   @Test void invalidIsUnparsed() {
     assertEquals(List.of("_unparsed"), p.parse("nope", "ip").tags());
   }
