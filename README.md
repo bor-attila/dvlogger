@@ -10,7 +10,7 @@ dvlogger ("dev logger") is a minimal, Graylog-like log platform for development 
 
 - **Ingest** free-text, JSON, or GELF log lines over TCP, UDP, or HTTP on a single port (`11222`).
 - **Store** every entry in MongoDB, with an optional permanent archive collection.
-- **Search** full text via Manticore Search, with a MongoDB fallback for exact document lookup.
+- **Search** full text via Manticore Search; matches are hydrated from MongoDB, the source of truth.
 - **Browse** everything from a small Nuxt dashboard, served by the same backend on `8080`.
 
 ## Quick start
@@ -87,9 +87,16 @@ All variables below can be set in `.env` (copied from `.env.example`); container
 
 With `ARCHIVE_ENABLED=true`, every ingested entry is additionally written to a separate,
 permanent `logs_archive` collection in MongoDB with **no TTL** — it is never deleted by
-retention. There is no dedicated archive UI: browse it directly in MongoDB (or via the
-archive search API), independently of `RETENTION_DAYS`, which only governs the primary,
-Manticore-indexed collection.
+retention. `RETENTION_DAYS` only governs the primary, Manticore-indexed collection.
+
+The dashboard has its own **Archívum** view for it: the menu entry appears whenever the backend
+reports `archiveEnabled: true`, and the view is served by `GET /api/archive/*`, which queries the
+archive collection in MongoDB directly — the archive is not indexed in Manticore, so archive
+search uses MongoDB text/regex matching and is slower than live search on large collections.
+
+Live search works the other way round: Manticore answers the full-text query with document ids,
+and the matching documents are then always hydrated from MongoDB (MongoDB is the source of truth
+for the stored entry, not a fallback).
 
 ### Reindexing
 
