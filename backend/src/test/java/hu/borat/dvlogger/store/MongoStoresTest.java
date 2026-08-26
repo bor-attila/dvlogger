@@ -90,6 +90,11 @@ class MongoStoresTest {
     }
     return null;
   }
+  private static int ttlPosition(io.vertx.core.json.JsonArray indexes) {
+    for (int i = 0; i < indexes.size(); i++)
+      if ("ts_ttl".equals(indexes.getJsonObject(i).getString("name"))) return i;
+    return -1;
+  }
   private static long ttlCount(io.vertx.core.json.JsonArray indexes) {
     return indexes.stream().map(o -> (JsonObject) o).filter(o -> "ts_ttl".equals(o.getString("name"))).count();
   }
@@ -98,6 +103,7 @@ class MongoStoresTest {
    * big collection); it must now leave an up-to-date index alone and use collMod to change it. */
   @Test void initIsIdempotentAndUpdatesTtlViaCollMod(VertxTestContext ctx) {
     MongoStore s14 = new MongoStore(client, 14), s3 = new MongoStore(client, 3);
+    java.util.concurrent.atomic.AtomicInteger position = new java.util.concurrent.atomic.AtomicInteger(-1);
     s14.init()
       .compose(v -> client.listIndexes(MongoStore.COLL))
       .compose(idx -> {
@@ -106,6 +112,7 @@ class MongoStoresTest {
           assertNotNull(ttl, "ts_ttl index missing");
           assertEquals(14L * 86400L, ttl.getNumber("expireAfterSeconds").longValue());
           assertEquals(new JsonObject().put("ts", 1), ttl.getJsonObject("key"));
+          position.set(ttlPosition(idx));
         });
         return s3.init();
       })
@@ -116,6 +123,8 @@ class MongoStoresTest {
           JsonObject ttl = ttlIndex(idx);
           assertEquals(259200L, ttl.getNumber("expireAfterSeconds").longValue());
           assertEquals(new JsonObject().put("ts", 1), ttl.getJsonObject("key"), "index key spec changed");
+          // collMod edits the index in place; a drop+create would move it to the end of the list.
+          assertEquals(position.get(), ttlPosition(idx), "ts_ttl was recreated, not modified in place");
         });
         return s3.init();
       })
@@ -143,6 +152,15 @@ class MongoStoresTest {
     s.insertMany(es)
       .compose(v -> s.forEachBatch(1, batch -> { seen.addAndGet(batch.size()); return Future.succeededFuture(); }))
       .onComplete(ctx.succeeding(v -> ctx.verify(() -> { assertEquals(n, seen.get()); ctx.completeNow(); })));
+  }
+
+  /** A document the mapper can't read must fail forEachBatch, not leave its promise dangling --
+   * an uncompleted promise means REINDEX_ON_START hangs startup with no error at all. */
+  @Test void forEachBatchFailsOnMalformedDocument(VertxTestContext ctx) {
+    MongoStore s = new MongoStore(client, 14);
+    client.insert(MongoStore.COLL, new JsonObject().put("message", "no ts field here"))
+      .compose(v -> s.forEachBatch(10, batch -> Future.succeededFuture()))
+      .onComplete(ctx.failing(t -> ctx.completeNow()));
   }
 
   @Test void archiveRegexWhenQuoted(VertxTestContext ctx) {

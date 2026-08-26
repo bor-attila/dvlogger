@@ -113,18 +113,25 @@ public class MongoStore {
     JsonObject q = afterId == null ? new JsonObject()
         : new JsonObject().put("_id", new JsonObject().put("$gt", new JsonObject().put("$oid", afterId)));
     client.findWithOptions(COLL, q, new FindOptions().setSort(new JsonObject().put("_id", 1)).setLimit(size))
+        // Both callback bodies are wrapped: LogEntry.fromMongo on a malformed document and
+        // fn.apply itself can throw synchronously, and a thrown callback would leave `done`
+        // uncompleted forever -- i.e. REINDEX_ON_START hanging startup with no error at all.
         .onComplete(found -> {
-          if (found.failed()) { done.fail(found.cause()); return; }
-          List<JsonObject> docs = found.result();
-          if (docs.isEmpty()) { done.complete(); return; }
-          List<LogEntry> batch = docs.stream().map(LogEntry::fromMongo).toList();
-          String lastId = batch.get(batch.size() - 1).id();
-          fn.apply(batch).onComplete(applied -> {
-            if (applied.failed()) { done.fail(applied.cause()); return; }
-            Context ctx = Vertx.currentContext();
-            if (ctx != null) ctx.runOnContext(v -> nextPage(lastId, size, fn, done));
-            else nextPage(lastId, size, fn, done);
-          });
+          try {
+            if (found.failed()) { done.tryFail(found.cause()); return; }
+            List<JsonObject> docs = found.result();
+            if (docs.isEmpty()) { done.tryComplete(); return; }
+            List<LogEntry> batch = docs.stream().map(LogEntry::fromMongo).toList();
+            String lastId = batch.get(batch.size() - 1).id();
+            fn.apply(batch).onComplete(applied -> {
+              try {
+                if (applied.failed()) { done.tryFail(applied.cause()); return; }
+                Context ctx = Vertx.currentContext();
+                if (ctx != null) ctx.runOnContext(v -> nextPage(lastId, size, fn, done));
+                else nextPage(lastId, size, fn, done);
+              } catch (Throwable t) { done.tryFail(t); }
+            });
+          } catch (Throwable t) { done.tryFail(t); }
         });
   }
 }

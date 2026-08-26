@@ -53,6 +53,17 @@ class WriterVerticleTest {
     }
   }
 
+  /** Real Mongo, but the first insert only lands after a delay -- long enough for a burst to fill
+   * the writer's buffer past the high-water mark and pause the event-bus consumer. */
+  static class SlowFirstMongo extends MongoStore {
+    private final Vertx vertx; private boolean first = true;
+    SlowFirstMongo(Vertx vertx, MongoClient client) { super(client, 14); this.vertx = vertx; }
+    @Override public Future<Void> insertMany(List<LogEntry> entries) {
+      if (first) { first = false; return vertx.timer(400).compose(v -> super.insertMany(entries)); }
+      return super.insertMany(entries);
+    }
+  }
+
   /** In-memory stand-in that always succeeds immediately: keeps flush() fully synchronous so
    * batchSize=1 messages never bundle into a single batch while a prior flush is in flight. */
   static class FakeMongo extends MongoStore {
@@ -157,6 +168,31 @@ class WriterVerticleTest {
             .onComplete(ctx.succeeding(count -> ctx.verify(() -> {
               assertEquals((long) n, count, "entries buffered at shutdown were lost");
               assertEquals(n, stats.written.get());
+              ctx.completeNow();
+            }))));
+      }));
+  }
+
+  /** Shutdown while the consumer is paused: the burst parked in the consumer's own pending queue
+   * must be written too -- unregister() would otherwise hand it to the discard handler. */
+  @Test void undeployDrainsPausedConsumerQueue(Vertx vertx, VertxTestContext ctx) {
+    int n = 60; // fits in high-water (2*20=40) + the consumer's pending queue (40), so nothing overflows
+    Config cfg = Config.fromEnv(Map.of("AUTH_USER","u","AUTH_PASSWORD","p","BATCH_SIZE","2","BATCH_MS","60000"));
+    MongoClient client = MongoClient.create(vertx, new JsonObject().put("connection_string", mongo.getConnectionString()).put("db_name", "wpause"));
+    Stats stats = new Stats();
+    WriterVerticle wv = new WriterVerticle(cfg, new SlowFirstMongo(vertx, client), null, new FakeIndex(vertx, 0), stats);
+    client.removeDocuments(MongoStore.COLL, new JsonObject())
+      .compose(v -> vertx.deployVerticle(wv))
+      .onComplete(ctx.succeeding(id -> {
+        for (int i = 0; i < n; i++)
+          vertx.eventBus().send(Ingest.ADDRESS, LogEntry.of(Instant.now(), "s", List.of(), null, "m" + i, "h", new JsonObject()).toMongo());
+        pollUntil(vertx, ctx, 5000, () -> assertTrue(wv.isPaused(), "consumer never paused"), () ->
+          vertx.undeploy(id)
+            .compose(v -> client.count(MongoStore.COLL, new JsonObject()))
+            .onComplete(ctx.succeeding(count -> ctx.verify(() -> {
+              assertEquals((long) n, count, "entries parked in the paused consumer were lost");
+              assertEquals(n, stats.written.get());
+              assertEquals(0, stats.overflowDropped.get());
               ctx.completeNow();
             }))));
       }));

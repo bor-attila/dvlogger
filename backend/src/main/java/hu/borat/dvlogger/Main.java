@@ -28,10 +28,10 @@ public class Main {
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
       try {
         vertx.close().toCompletionStage().toCompletableFuture().get(15, java.util.concurrent.TimeUnit.SECONDS);
+        System.out.println("dvlogger shutdown complete");
       } catch (Exception e) {
-        System.err.println("shutdown: " + e);
+        System.err.println("dvlogger shutdown timed out/failed: " + e);
       }
-      System.out.println("dvlogger shutdown complete");
     }, "dvlogger-shutdown"));
 
     Future<String> startup = retry(() -> mongo.init().compose(v -> archive == null ? Future.succeededFuture() : archive.init()).compose(v -> index.init()), 30, vertx)
@@ -42,7 +42,9 @@ public class Main {
       .compose(v -> vertx.deployVerticle(new UdpReceiverVerticle(cfg, parser)))
       .compose(v -> vertx.deployVerticle(new ApiVerticle(cfg, mongo, archive, index, stats, parser)))
       .onSuccess(id -> System.out.println("dvlogger up: http " + cfg.httpPort() + ", ingest tcp/udp " + cfg.ingestPort()))
-      .onFailure(t -> { t.printStackTrace(); System.exit(1); });
+      // System.exit() runs the shutdown hook on the calling thread; calling it from an event loop
+      // would have the hook's vertx.close() wait on the very thread it needs, so exit off-loop.
+      .onFailure(t -> { t.printStackTrace(); new Thread(() -> System.exit(1), "exit").start(); });
 
     // Vert.x creates its event-loop threads lazily -- only once real work is actually
     // dispatched onto one -- and the Mongo/MySQL clients above run their initial handshake on

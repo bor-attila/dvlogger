@@ -34,6 +34,8 @@ public class WriterVerticle extends AbstractVerticle {
   private Future<Void> inFlight;
   private boolean paused = false;
   private MessageConsumer<JsonObject> consumer;
+  /** cfg.batchSize() clamped to >= 1: a batch size of 0 would flush empty batches forever. */
+  private int batchSize;
   /** High-water mark: above this many buffered entries the consumer is paused. */
   private int highWater;
   /** Low-water mark: the consumer is resumed once the buffer drains back to this. */
@@ -44,8 +46,9 @@ public class WriterVerticle extends AbstractVerticle {
   }
 
   @Override public void start(Promise<Void> start) {
-    highWater = cfg.batchSize() * 20;
-    lowWater = cfg.batchSize() * 10;
+    batchSize = Math.max(1, cfg.batchSize());
+    highWater = batchSize * 20;
+    lowWater = batchSize * 10;
     consumer = vertx.eventBus().consumer(Ingest.ADDRESS);
     // Backpressure has two stages. Stage 1: our own buffer is capped at highWater entries; past
     // that we pause the consumer. Stage 2: while paused, Vert.x queues incoming messages in the
@@ -58,10 +61,9 @@ public class WriterVerticle extends AbstractVerticle {
     if (consumer instanceof MessageConsumerImpl<JsonObject> impl)
       impl.discardHandler(m -> stats.overflowDropped.incrementAndGet());
     consumer.handler(m -> {
-      stats.received.incrementAndGet();
-      buffer.add(LogEntry.fromMongo(m.body()));
+      buffer(m);
       if (!paused && buffer.size() >= highWater) { paused = true; consumer.pause(); }
-      if (buffer.size() >= cfg.batchSize()) flush();
+      if (buffer.size() >= batchSize) flush();
     });
     vertx.setPeriodic(cfg.batchMs(), t -> flush());
     vertx.setPeriodic(2000, t -> retryReindex());
@@ -78,7 +80,7 @@ public class WriterVerticle extends AbstractVerticle {
   private Future<Void> flush() {
     if (flushing) return inFlight == null ? Future.succeededFuture() : inFlight;
     if (buffer.isEmpty()) return Future.succeededFuture();
-    int n = Math.min(buffer.size(), cfg.batchSize());
+    int n = Math.min(buffer.size(), batchSize);
     List<LogEntry> batch = new ArrayList<>(buffer.subList(0, n));
     buffer.subList(0, n).clear();
     flushing = true;
@@ -96,9 +98,14 @@ public class WriterVerticle extends AbstractVerticle {
         done.complete();
         // Drain loop: keep flushing batchSize-sized batches while anything is left, instead of
         // letting the buffer grow until one giant batch is written.
-        if (!buffer.isEmpty()) vertx.runOnContext(v -> flush());
+        if (!buffer.isEmpty()) context.runOnContext(v -> flush());
       });
     return done.future();
+  }
+
+  private void buffer(io.vertx.core.eventbus.Message<JsonObject> m) {
+    stats.received.incrementAndGet();
+    buffer.add(LogEntry.fromMongo(m.body()));
   }
 
   private Future<Void> writeMongo(List<LogEntry> batch, int attempts) {
@@ -148,11 +155,26 @@ public class WriterVerticle extends AbstractVerticle {
     // Stop accepting new entries, let the in-flight flush finish, then write out everything that
     // queued up behind it (the old code returned early whenever a flush was in flight, silently
     // losing the buffer).
+    //
+    // A paused consumer holds a burst in its own pending queue, and unregister() hands that queue
+    // to the discard handler rather than to us -- so first resume it, and swap the discard handler
+    // for one that buffers those messages instead of counting them as dropped. One turn of the
+    // event loop after unregister() then covers messages it emitted asynchronously, so the buffer
+    // holds everything before the final drain.
+    if (paused) { paused = false; consumer.resume(); }
+    if (consumer instanceof MessageConsumerImpl<JsonObject> impl) impl.discardHandler(this::buffer);
     consumer.unregister()
+      .compose(v -> nextTick())
       .compose(v -> inFlight == null ? Future.<Void>succeededFuture() : inFlight)
       .compose(v -> drainAll())
       .compose(v -> flushReindexQueue())
       .onComplete(ar -> stop.complete());
+  }
+
+  private Future<Void> nextTick() {
+    Promise<Void> tick = Promise.promise();
+    context.runOnContext(v -> tick.complete());
+    return tick.future();
   }
 
   /** Package-private for tests: entries buffered but not yet handed to a flush. */
@@ -160,4 +182,5 @@ public class WriterVerticle extends AbstractVerticle {
   /** Package-private for tests: whether the event-bus consumer is currently paused. */
   boolean isPaused() { return paused; }
   int highWater() { return highWater; }
+  int batchSize() { return batchSize; }
 }
