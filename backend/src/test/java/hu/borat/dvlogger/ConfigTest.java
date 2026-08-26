@@ -20,12 +20,14 @@ class ConfigTest {
     assertEquals(500, c.batchSize());
     assertEquals(200, c.batchMs());
     assertTrue(c.reindexOnStart());
+    assertFalse(c.noFooterText());
   }
   @Test void envOverrides() {
     Config c = Config.fromEnv(Map.of("AUTH_USER","u","AUTH_PASSWORD","p","ARCHIVE_ENABLED","true",
-        "LOG_FORMAT","gelf","RETENTION_DAYS","3","INGEST_TOKEN","t","BATCH_SIZE","10"));
+        "LOG_FORMAT","gelf","NO_FOOTER_TEXT","true","RETENTION_DAYS","3","INGEST_TOKEN","t","BATCH_SIZE","10"));
     assertTrue(c.archiveEnabled());
     assertEquals("gelf", c.logFormat());
+    assertTrue(c.noFooterText());
     assertEquals(3, c.retentionDays());
     assertEquals("t", c.ingestToken());
     assertEquals(10, c.batchSize());

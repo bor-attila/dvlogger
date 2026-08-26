@@ -21,6 +21,7 @@ class HealthTest {
         assertEquals(200, resp.statusCode());
         assertEquals("ok", resp.bodyAsJsonObject().getString("status"));
         assertTrue(resp.bodyAsJsonObject().getBoolean("archiveEnabled"));
+        assertTrue(resp.bodyAsJsonObject().getBoolean("footerText"));
         assertTrue(resp.bodyAsJsonObject().containsKey("stats"));
         ctx.completeNow();
       })));

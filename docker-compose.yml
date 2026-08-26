@@ -18,6 +18,7 @@ services:
       BATCH_SIZE: ${BATCH_SIZE:-500}
       BATCH_MS: ${BATCH_MS:-200}
       REINDEX_ON_START: ${REINDEX_ON_START:-true}
+      NO_FOOTER_TEXT: ${NO_FOOTER_TEXT:-false}
       MONGO_URL: mongodb://mongo:27017/dvlogger
       MANTICORE_HOST: manticore
       MANTICORE_PORT: "9306"

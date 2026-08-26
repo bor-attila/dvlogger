@@ -6,7 +6,7 @@ import java.util.Set;
 public record Config(String authUser, String authPassword, boolean archiveEnabled, String logFormat,
                      String logTextPattern, int retentionDays, String mongoUrl, String manticoreHost,
                      int manticorePort, int httpPort, int ingestPort, String ingestToken,
-                     int batchSize, int batchMs, boolean reindexOnStart) {
+                     int batchSize, int batchMs, boolean reindexOnStart, boolean noFooterText) {
 
   private static final Set<String> FORMATS = Set.of("text", "json", "gelf", "auto");
 
@@ -28,7 +28,8 @@ public record Config(String authUser, String authPassword, boolean archiveEnable
         blankToNull(env.get("INGEST_TOKEN")),
         intOf(env, "BATCH_SIZE", 500),
         intOf(env, "BATCH_MS", 200),
-        Boolean.parseBoolean(env.getOrDefault("REINDEX_ON_START", "true")));
+        Boolean.parseBoolean(env.getOrDefault("REINDEX_ON_START", "true")),
+        Boolean.parseBoolean(env.getOrDefault("NO_FOOTER_TEXT", "false")));
   }
 
   private static String required(Map<String, String> env, String key) {

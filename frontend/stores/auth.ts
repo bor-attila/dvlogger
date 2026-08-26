@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 
 export const useAuthStore = defineStore('auth', {
-  state: () => ({ user: null as string | null, checked: false, archiveEnabled: false }),
+  state: () => ({ user: null as string | null, checked: false, archiveEnabled: false, footerText: true }),
   actions: {
     async load() {
       try {
@@ -9,8 +9,9 @@ export const useAuthStore = defineStore('auth', {
         this.user = me.user ?? null
       } catch { this.user = null }
       try {
-        const h = await $fetch<{ archiveEnabled: boolean }>('/api/health')
+        const h = await $fetch<{ archiveEnabled: boolean; footerText?: boolean }>('/api/health')
         this.archiveEnabled = h.archiveEnabled
+        this.footerText = h.footerText !== false
       } catch { /* backend down: leave default */ }
       this.checked = true
     },

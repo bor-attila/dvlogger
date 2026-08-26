@@ -34,7 +34,7 @@ public class ApiVerticle extends AbstractVerticle {
     Router router = Router.router(vertx);
     router.route().handler(BodyHandler.create().setBodyLimit(10 * 1024 * 1024));
     router.get("/api/health").handler(rc -> rc.json(new JsonObject()
-        .put("status", "ok").put("archiveEnabled", cfg.archiveEnabled())
+        .put("status", "ok").put("archiveEnabled", cfg.archiveEnabled()).put("footerText", !cfg.noFooterText())
         .put("stats", stats == null ? new JsonObject() : stats.toJson())));
     SessionHandler sessionHandler = SessionHandler.create(LocalSessionStore.create(vertx))
         .setCookieHttpOnlyFlag(true).setCookieSameSite(CookieSameSite.STRICT);

@@ -77,6 +77,7 @@ All variables below can be set in `.env` (copied from `.env.example`); container
 | `ARCHIVE_ENABLED` | `true` | Also write every entry to a permanent, non-expiring archive collection |
 | `RETENTION_DAYS` | `14` | TTL for the primary (non-archive) log collection, in days |
 | `REINDEX_ON_START` | `true` | On startup, rebuild the Manticore search index from MongoDB |
+| `NO_FOOTER_TEXT` | `false` | Hide the "Vibed with Love" footer in the dashboard |
 | `INGEST_TOKEN` | *(unset)* | If set, `POST /api/ingest` requires header `X-Ingest-Token: <value>` |
 | `BATCH_SIZE` | `500` | Max entries per write batch (Mongo + Manticore) |
 | `BATCH_MS` | `200` | Max time (ms) to wait before flushing a partial batch |
